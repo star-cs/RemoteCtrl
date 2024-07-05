@@ -5,6 +5,8 @@ VisualStudioVersion = 17.8.34511.84
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RemoteCtrl", "RemoteCtrl\RemoteCtrl.vcxproj", "{A8DF5864-AC87-4856-85DD-4B7E50384C0A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RemoteClient", "RemoteClient\RemoteClient.vcxproj", "{D3DA14F9-6988-4AEC-B6F0-67CB50396548}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{A8DF5864-AC87-4856-85DD-4B7E50384C0A}.Release|x64.Build.0 = Release|x64
 		{A8DF5864-AC87-4856-85DD-4B7E50384C0A}.Release|x86.ActiveCfg = Release|Win32
 		{A8DF5864-AC87-4856-85DD-4B7E50384C0A}.Release|x86.Build.0 = Release|Win32
+		{D3DA14F9-6988-4AEC-B6F0-67CB50396548}.Debug|x64.ActiveCfg = Debug|x64
+		{D3DA14F9-6988-4AEC-B6F0-67CB50396548}.Debug|x64.Build.0 = Debug|x64
+		{D3DA14F9-6988-4AEC-B6F0-67CB50396548}.Debug|x86.ActiveCfg = Debug|Win32
+		{D3DA14F9-6988-4AEC-B6F0-67CB50396548}.Debug|x86.Build.0 = Debug|Win32
+		{D3DA14F9-6988-4AEC-B6F0-67CB50396548}.Release|x64.ActiveCfg = Release|x64
+		{D3DA14F9-6988-4AEC-B6F0-67CB50396548}.Release|x64.Build.0 = Release|x64
+		{D3DA14F9-6988-4AEC-B6F0-67CB50396548}.Release|x86.ActiveCfg = Release|Win32
+		{D3DA14F9-6988-4AEC-B6F0-67CB50396548}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
