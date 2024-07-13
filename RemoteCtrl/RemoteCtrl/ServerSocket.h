@@ -3,6 +3,90 @@
 #include "pch.h"
 #include "framework.h"
 
+class CPacket
+{
+public:
+	CPacket() :sHead(0), nLength(0), sCmd(0), sSum(0) {}
+
+	CPacket(const CPacket& pack) {
+		sHead = pack.sHead;
+		nLength = pack.nLength;
+		sCmd = pack.sCmd;
+		strData = pack.strData;
+		sSum = pack.sSum;
+	}
+
+	//nSize传入是数据大小，传出是获取的数据量
+	CPacket(const BYTE* pData, size_t& nSize) {
+		size_t i = 0;
+		//遍历pData，找到以0xFEFF开头的包头。
+		for (; i < nSize; i++) {
+			if (*(WORD*)(pData + i) == 0xFEFF) {
+				sHead = *(WORD*)(pData + i);
+				i += 2;
+				break;
+			}
+		}
+		//可以等于nSize，只有控制命令，无包数据。
+		if (i + 4 + 2 + 2 > nSize) {	//包数据可能不全，或者包头未能全部接收到。
+			nSize = 0;
+			return;
+		}
+
+		nLength = *(DWORD*)(pData + i);
+		i += 4;
+		if (i + nLength > nSize) {		//可能没有对大数据包进行 发送端 分包处理。nLength记录着整个包的长度。
+			nSize = 0;
+			return;
+		}
+
+		sCmd = *(WORD*)(pData + i);
+		i += 2;
+		if (nLength > 4) {
+			strData.resize(nLength - 2 - 2);
+			memcpy((void*)strData.c_str(), pData + i, nLength - 4);
+			i += nLength - 4;
+		}
+
+		sSum = *(WORD*)(pData + i);
+		i += 2;
+
+		WORD temp = 0;
+		for (int j = 0; j < strData.size(); j++) {
+			temp += BYTE(strData[i]) & 0xFF;
+		}
+
+		if (temp == sSum) {
+			//nSize = nLength + 2 + 4;
+			nSize = i;						//包头前面可能有无效数据，得记录全部，并传出。
+			return;
+		}
+		nSize = 0;
+	}
+	~CPacket(){}
+
+	CPacket& operator=(const CPacket& pack) {
+		if (this != &pack) {
+			sHead = pack.sHead;
+			nLength = pack.nLength;
+			sCmd = pack.sCmd;
+			strData = pack.strData;
+			sSum = pack.sSum;
+		}
+		return *this;
+	}
+public:
+	//unsigned short	WORD
+	//unsigned long		DWORD
+
+	WORD sHead;		//固定为，0xFEFF							2
+	DWORD nLength;	//包长度 从控制命令开始，到和检验结束		4
+	WORD sCmd;		//控制命令								2
+	std::string strData;	//包数据							
+	WORD sSum;		//和校验	 校验包数据						2
+
+};
+
 class CServerSocket
 {
 public:
@@ -35,24 +119,39 @@ public:
 		cli_sock = accept(serv_sock, (sockaddr*)&cli_addr, &cli_sz);
 		if (cli_sock == -1)	return false;
 		return true;
-		//recv(cli_sock, buffer, sizeof(buffer), 0);
-		//send(cli_sock, buffer, sizeof(buffer), 0);
 	}
 
+#define BUFFER_SIZE 4096
+
+	//获取命令
 	int DealCommand() {
 		if (cli_sock == -1) return -1;
+		//char buffer[1024] = "";
+		char* buffer = new char[BUFFER_SIZE];
+		memset(buffer, 0, sizeof(buffer));
+		size_t index = 0;		
 		while (true) {
-			int len = recv(cli_sock, buffer, sizeof(buffer), 0);
+			size_t len = recv(cli_sock, buffer + index, BUFFER_SIZE - index, 0);
 			if (len <= 0) {
 				return -1;
 			}
-			// TODO:处理命令
+			index += len;
+			len = index;
+			m_packet = CPacket((BYTE*)buffer, len);
+
+			if (len > 0) {
+				//void *memmove(void *dest, const void *src, size_t n);
+				memmove(buffer, buffer + len, BUFFER_SIZE - len);
+				index -= len;				//可以理解为，前一次解包，未处理剩余字节的个位。
+				return m_packet.sCmd;
+			}
 		}
+		return -1;
 	}
 
 	bool Send(const char* pData, int nSize) {
 		if (cli_sock == -1) return false;
-		return send(cli_sock, buffer, sizeof(buffer), 0) > 0;
+		return send(cli_sock, pData, nSize, 0) > 0;
 	}
 
 private:
@@ -60,9 +159,8 @@ private:
 	SOCKET cli_sock;
 	sockaddr_in serv_addr;
 	sockaddr_in cli_addr;
+	CPacket m_packet;
 	int cli_sz = sizeof(cli_addr);
-	char buffer[1024] = "";
-
 
 	CServerSocket& operator=(const CServerSocket& ss) {}
 

@@ -1,3 +1,7 @@
+# 配置
+属性-链接器-所有选项-入口点（mainCRTStartup） 子系统（窗口）
+#pragma comment(linker, "/subsystem:windows /entry:mainCRTStartup")
+
 # 单例模式 辅助类（如CHelper）
 在C++中，对于单例模式的实现，使用一个辅助类（如CHelper）来确保单例对象的正确创建和销毁是一种常见做法，尤其是在涉及动态分配和资源管理时。下面解释为什么需要helper类来协助删除单例对象，而不是直接在对象不再需要时调用析构函数：
 单例生命周期管理的挑战
