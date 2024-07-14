@@ -177,3 +177,37 @@ HINSTANCE ShellExecuteA(
 
 ### fclose()
 
+
+## 鼠标操作
+
+### SetCursorPos()
+用于将鼠标光标移动到屏幕上的指定位置
+
+### mouse_event()
+
+### GetMessageExtraInfo()
+
+### 移动鼠标
+当你在Windows API中使用 `SetCursorPos` 和 `mouse_event` 来移动鼠标时，这两个函数的行为有一些关键的不同点：
+
+`SetCursorPos`
+```cpp
+SetCursorPos(mouse.ptXY.x, mouse.ptXY.y);
+```
+- **作用**：这行代码仅负责移动鼠标光标到 `(mouse.ptXY.x, mouse.ptXY.y)` 指定的坐标位置。
+- **不产生事件**：`SetCursorPos` 不会产生任何鼠标事件，这意味着它不会被任何应用程序视为用户输入。应用程序不会接收到与移动相关的WM_MOUSEMOVE消息。
+
+`mouse_event`
+```cpp
+mouse_event(MOUSEEVENTF_MOVE, mouse.ptXY.x, mouse.ptXY.y, 0, GetMessageExtraInfo());
+```
+- **作用**：这行代码会发送一个鼠标移动事件到系统，仿佛是用户自然地移动了鼠标。
+- **产生事件**：`mouse_event` 使用 `MOUSEEVENTF_MOVE` 标志来模拟鼠标移动，并且它会向系统发送一个WM_MOUSEMOVE消息，因此应用程序会认为这是一个真实的用户输入。
+- **额外信息**：传递给 `mouse_event` 的最后一个参数是 `GetMessageExtraInfo()`，这通常用于在64位系统上获取鼠标位置的高32位。这样可以确保在大分辨率屏幕上移动事件的准确性。
+
+`区别总结`
+- **事件生成**：`SetCursorPos` 不生成鼠标移动事件，而 `mouse_event` 则会生成。
+- **系统通知**：`SetCursorPos` 不通知系统或应用程序鼠标已移动，而 `mouse_event` 会通过事件通知系统和应用程序。
+- **用户输入模拟**：`SetCursorPos` 仅移动光标，没有模拟用户输入；`mouse_event` 则完全模拟用户移动鼠标的行为。
+
+在自动化测试或者需要模拟用户交互的脚本中，你可能更倾向于使用 `mouse_event`，因为它能够更准确地模拟用户行为，从而触发应用程序的预期响应。然而，如果你只是想要改变光标的位置，而不关心是否触发相关事件，`SetCursorPos` 就足够了。
