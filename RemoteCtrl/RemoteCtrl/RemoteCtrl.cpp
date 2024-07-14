@@ -57,11 +57,12 @@ typedef struct file_info {
     file_info() {
         IsInvalid = FALSE;
         IsDirectory = -1;
+        HasNext = TRUE;
         memset(szFileName, 0, sizeof(szFileName));
     }
     BOOL IsInvalid;         //是否有效
-    BOOL IsDirectory;       //是否为目录 0否 1是
-    BOOL HasNext;           //是否还有后续 0没有 1有
+    BOOL IsDirectory;       //是否为目录 0否 1是 -1无效（默认）
+    BOOL HasNext;           //是否还有后续 0没有 1有（默认）
     char szFileName[256];   //文件名 
 }FILEINFO, *PFILEINFO;
 
@@ -123,6 +124,64 @@ int MakeDirectoryInfo() {
     return 0;
 }
 
+int RunFile() {
+    std::string strPath;
+    if (CServerSocket::getInstance()->GetFilePath(strPath) == false) {
+        OutputDebugString(_T("当前的命令不是启动文件，命令解析错误！"));
+        return -1;
+    }
+
+    ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+
+    //成功后，回应。
+    CPacket pack(3, NULL, 0);
+    if (CServerSocket::getInstance()->Send(pack) == false) {
+        OutputDebugString(_T("发送失败"));
+        return -2;
+    }
+    return 0;
+}
+
+//服务器传给客户端 文件。
+int DownloadFile() {
+    std::string strPath;
+    CServerSocket::getInstance()->GetFilePath(strPath);
+    long long data = 0;     //文件长度
+    //FILE* pFile = fopen(strPath.c_str(), "rb");
+    FILE* pFile = NULL;
+    errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
+    if (err != 0) {
+        CPacket pack(4, (BYTE*)&data, 0);
+        CServerSocket::getInstance()->Send(pack);
+        return -1;
+    }
+
+    if (pFile != NULL) {
+        //发送文件大小信息，用于计算下载文件的进度信息。
+        fseek(pFile, 0, SEEK_END);
+        data = ftell(pFile);
+        CPacket head(4, (BYTE*)&data, 8);
+        CServerSocket::getInstance()->Send(head);
+
+        fseek(pFile, 0, SEEK_SET);
+
+        char buffer[1024] = "";
+        size_t rlen = 0;
+
+        do {
+            rlen = fread(buffer, 1, 1024, pFile);
+            CPacket pack(4, (BYTE*)&buffer, rlen);
+            CServerSocket::getInstance()->Send(pack);
+        } while (rlen >= 1024);
+
+        fclose(pFile);
+    }
+
+    //标记结束
+    CPacket pack(4, NULL, 0);
+    CServerSocket::getInstance()->Send(pack);
+    return 0;
+}
 
 int main()
 {
@@ -169,9 +228,16 @@ int main()
                 MakeDriverInfo();
                 break;
             case 2:
+                //查看指定目录下的文件
                 MakeDirectoryInfo();
                 break;
-                 
+            case 3:
+                //打开文件
+                RunFile();
+                break;
+            case 4:
+                DownloadFile();
+                break;
             }
         }
     }

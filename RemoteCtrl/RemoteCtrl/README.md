@@ -147,5 +147,33 @@ int _findnext(
 );
 ```
 
+## ShellExecuteA()
+启动与 shell 动作关联的操作，比如打开文件、文件夹或者其他应用程序。
 
+```cpp
+HINSTANCE ShellExecuteA(
+  HWND hwnd,     // 父窗口句柄，通常为 NULL
+  LPCSTR lpOperation, // 执行的操作，如 "open"
+  LPCSTR lpFile,      // 文件名或可执行文件的路径
+  LPCSTR lpParameters,// 参数，可选
+  LPCSTR lpDirectory, // 启动目录，可选
+  INT nShowCmd        // 显示窗口的方式
+);
+```
+
+## 文件操作
+
+### fopen()  fopen_s()
+
+
+
+### fseek()
+
+### ftell()
+
+### fread()
+
+### fwrite()
+
+### fclose()
 
