@@ -42,3 +42,46 @@ CHelper类的引入解决了上述问题。CHelper有一个构造函数和一个析构函数，它们分别在CH
 总结
 
 使用CHelper类来管理单例对象的生命周期，是C++中一种优雅的解决方案，它确保了资源的正确释放，同时避免了析构函数不能显式调用带来的问题。这种方法尤其适用于那些需要在程序启动时初始化并在程序结束时清理的资源密集型对象，如数据库连接或网络套接字。
+
+# 数据解包后存在多个 CC 内存对齐问题。
+```cpp
+#pragma pack(push)
+#pragma pack(1)	//按照一字节对齐，解决CC的问题
+class Packet
+{
+    ...
+    ...
+};
+
+#pragma pack(pop)
+```
+禁止内存对齐。
+
+# (const char*)&pack 不合理
+
+将 Packet 类的实例转换为 BYTE* 指针，意味着你想将整个 Packet 对象的内存布局扁平化为一个字节数组。
+这样做可以有多种用途，比如在网络上传输数据或者将数据写入文件。
+然而，由于 Packet 包含一个 std::string 成员，这个操作并不像对纯 POD（Plain Old Data）结构体那样直接。
+
+std::string 在内部包含三个部分：指向字符串数据的指针、字符串的大小以及字符串的容量。
+这意味着 std::string 并不是一个简单的连续内存块，不能简单地通过取地址的方式将其转换为一个字节指针并保证序列化正确。
+
+可能得到的是 std::string元素的地址。
+
+```cpp
+    const char* Data() {
+		strOut.resize(Size());
+		BYTE* pData = (BYTE*)strOut.c_str();
+		*(WORD*)pData = sHead;	pData += 2;
+		*(DWORD*)pData = nLength; pData += 4;
+		*(WORD*)pData = sCmd;	pData += 2;
+		memcpy(pData, strData.c_str(), strData.size());	pData += strData.size();
+		*(WORD*)pData = sSum;
+		return strOut.c_str(); 
+	}
+
+public: 
+    std::string strOut;
+```
+
+

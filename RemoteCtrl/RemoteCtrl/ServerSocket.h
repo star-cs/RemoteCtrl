@@ -3,10 +3,26 @@
 #include "pch.h"
 #include "framework.h"
 
+#pragma pack(push)
+#pragma pack(1)	//按照一字节对齐，解决CC的问题
+
 class CPacket
 {
 public:
 	CPacket() :sHead(0), nLength(0), sCmd(0), sSum(0) {}
+
+	//nSize 数据大小
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
+		sHead = 0xFEFF;
+		nLength = nSize + 4;
+		sCmd = nCmd;
+		strData.resize(nSize);
+		memcpy((void*)strData.c_str(), pData, nSize);
+		sSum = 0;
+		for (int j = 0; j < nSize; j++) {
+			sSum += BYTE(pData[j]) & 0xFF;
+		}
+	}
 
 	CPacket(const CPacket& pack) {
 		sHead = pack.sHead;
@@ -53,7 +69,7 @@ public:
 
 		WORD temp = 0;
 		for (int j = 0; j < strData.size(); j++) {
-			temp += BYTE(strData[i]) & 0xFF;
+			temp += BYTE(strData[j]) & 0xFF;
 		}
 
 		if (temp == sSum) {
@@ -63,6 +79,7 @@ public:
 		}
 		nSize = 0;
 	}
+
 	~CPacket(){}
 
 	CPacket& operator=(const CPacket& pack) {
@@ -75,6 +92,22 @@ public:
 		}
 		return *this;
 	}
+
+	int Size() {	//数据的大小
+		return nLength + 6;
+	}
+
+	const char* Data() {
+		strOut.resize(Size());
+		BYTE* pData = (BYTE*)strOut.c_str();
+		*(WORD*)pData = sHead;	pData += 2;
+		*(DWORD*)pData = nLength; pData += 4;
+		*(WORD*)pData = sCmd;	pData += 2;
+		memcpy(pData, strData.c_str(), strData.size());	pData += strData.size();
+		*(WORD*)pData = sSum;
+		return strOut.c_str(); 
+	}
+
 public:
 	//unsigned short	WORD
 	//unsigned long		DWORD
@@ -84,8 +117,9 @@ public:
 	WORD sCmd;		//控制命令								2
 	std::string strData;	//包数据							
 	WORD sSum;		//和校验	 校验包数据						2
-
+	std::string strOut;
 };
+#pragma pack(pop)
 
 class CServerSocket
 {
@@ -152,6 +186,13 @@ public:
 	bool Send(const char* pData, int nSize) {
 		if (cli_sock == -1) return false;
 		return send(cli_sock, pData, nSize, 0) > 0;
+	}
+
+	bool Send(CPacket& pack) {
+		if (cli_sock == -1) return false;
+		//(const char*)&pack 这种转换的目的是为了能够以字节流的形式访问 pack 实例中的数据。
+		//return send(cli_sock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0;
+		return send(cli_sock, pack.Data(), pack.Size(), 0) > 0;
 	}
 
 private:
