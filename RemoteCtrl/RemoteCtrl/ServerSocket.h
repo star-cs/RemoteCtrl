@@ -195,6 +195,15 @@ public:
 		return send(cli_sock, pack.Data(), pack.Size(), 0) > 0;
 	}
 
+	bool GetFilePath(std::string& strPath) {
+		if (m_packet.sCmd == 2)
+		{
+			strPath = m_packet.strData;
+			return true;
+		}
+		return false;
+	}
+
 private:
 	SOCKET serv_sock;
 	SOCKET cli_sock;

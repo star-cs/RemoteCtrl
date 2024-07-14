@@ -43,6 +43,7 @@ CHelper类的引入解决了上述问题。CHelper有一个构造函数和一个析构函数，它们分别在CH
 
 使用CHelper类来管理单例对象的生命周期，是C++中一种优雅的解决方案，它确保了资源的正确释放，同时避免了析构函数不能显式调用带来的问题。这种方法尤其适用于那些需要在程序启动时初始化并在程序结束时清理的资源密集型对象，如数据库连接或网络套接字。
 
+
 # 数据解包后存在多个 CC 内存对齐问题。
 ```cpp
 #pragma pack(push)
@@ -83,5 +84,68 @@ std::string 在内部包含三个部分：指向字符串数据的指针、字符串的大小以及字符串的容
 public: 
     std::string strOut;
 ```
+
+# char 数组赋值
+```cpp
+    memcpy(finfo->szFileName, fdata.name, strlen(fdata.name));
+```
+
+
+
+
+# API笔记
+## OutputDebugString();
+OutputDebugString 是一个 Windows API 函数，主要用于在调试过程中向调试器输出文本消息。
+
+## _chdir()  
+这个函数允许程序在运行时切换目录，这对于访问不同位置的文件或目录非常有用。
+```cpp
+int _chdir(
+   const char *path
+);
+```
+
+## _finddata_t 结构体
+```cpp
+struct _finddata_t {
+    unsigned int attrib;       // 文件属性
+    size_t size;               // 文件大小
+    time_t time_create;        // 创建时间
+    time_t time_access;        // 上次访问时间
+    time_t time_write;         // 上次修改时间
+    char name[260];            // 文件名
+};
+```
+
+> attrib 文件属性
+> _A_NORMAL: 文件正常，没有特殊属性（0x00）
+> _A_RDONLY: 文件只读（0x01）
+> _A_HIDDEN: 文件隐藏（0x02）
+> _A_SYSTEM: 文件是系统文件（0x04）
+> _A_VOLID: 通常用于表示文件不再存在于卷上（0x08），但此标志的实际含义可能因文件系统而异
+> _A_SUBDIR: 文件是一个子目录（0x10）
+> _A_ARCH: 文件的存档属性，通常表示文件已被修改或创建（0x20）
+
+
+## _findfirst()   
+在 Windows 平台上用于文件枚举，类似于 Unix 中的 glob() 函数。
+```cpp
+intptr_t _findfirst(
+   const char *filename,     /* 文件名模式 */                // "*" "*.txt" ...
+   struct _finddata_t *fileinfo /* 结果信息结构体的指针 */
+);
+```
+
+## _findnext()
+在使用 _findfirst 函数初始化搜索后继续枚举目录中的文件。这个函数允许你遍历当前目录中与指定模式匹配的所有文件。
+
+_findnext 的原型如下：
+```cpp
+int _findnext(
+   intptr_t hFile,       // 文件查找句柄
+   struct _finddata_t *fileinfo // 文件信息结构体的指针
+);
+```
+
 
 
