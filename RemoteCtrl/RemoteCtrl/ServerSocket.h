@@ -180,7 +180,7 @@ public:
 	int DealCommand() {
 		if (cli_sock == -1) return -1;
 		//char buffer[1024] = "";
-		char* buffer = new char[BUFFER_SIZE];
+		char* buffer = new char[BUFFER_SIZE];	//创建在堆区，所以剩余的数据会一直存在。但是 buffer 每次都是重新创建
 		memset(buffer, 0, sizeof(buffer));
 		size_t index = 0;		
 		while (true) {
@@ -192,6 +192,7 @@ public:
 			len = index;
 			m_packet = CPacket((BYTE*)buffer, len);
 
+			// TODO 
 			if (len > 0) {
 				//void *memmove(void *dest, const void *src, size_t n);
 				memmove(buffer, buffer + len, BUFFER_SIZE - len);

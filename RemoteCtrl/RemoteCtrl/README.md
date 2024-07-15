@@ -94,6 +94,7 @@ public:
 
 
 # API笔记
+
 ## OutputDebugString();
 OutputDebugString 是一个 Windows API 函数，主要用于在调试过程中向调试器输出文本消息。
 
@@ -211,3 +212,153 @@ mouse_event(MOUSEEVENTF_MOVE, mouse.ptXY.x, mouse.ptXY.y, 0, GetMessageExtraInfo
 - **用户输入模拟**：`SetCursorPos` 仅移动光标，没有模拟用户输入；`mouse_event` 则完全模拟用户移动鼠标的行为。
 
 在自动化测试或者需要模拟用户交互的脚本中，你可能更倾向于使用 `mouse_event`，因为它能够更准确地模拟用户行为，从而触发应用程序的预期响应。然而，如果你只是想要改变光标的位置，而不关心是否触发相关事件，`SetCursorPos` 就足够了。
+
+
+## 发送屏幕
+```cpp
+int SendScreen()
+{
+    CImage screen;  //GDI
+
+    HDC hScreen = ::GetDC(NULL);
+    int nBitPerPixel = GetDeviceCaps(hScreen, BITSPIXEL);
+    int nWidth = GetDeviceCaps(hScreen, HORZRES);
+    int nHeigth = GetDeviceCaps(hScreen, VERTRES);
+
+    screen.Create(nWidth, nHeigth, nBitPerPixel);
+
+    BitBlt(screen.GetDC(), 0, 0, nWidth, nHeigth, hScreen, 0, 0, SRCCOPY);
+
+    ReleaseDC(NULL, hScreen);
+
+    //screen.Save(_T("test2020.png"), Gdiplus::ImageFormatPNG);
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+    if (hMem == NULL) {
+        return -1;
+    }
+
+    IStream* pStream = NULL;
+
+    HRESULT ret = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+
+    if (ret == S_OK) {
+        screen.Save(pStream, Gdiplus::ImageFormatPNG);
+
+        LARGE_INTEGER bg = { 0 };
+        pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+
+        PBYTE pData = (PBYTE)GlobalLock(hMem);
+
+        SIZE_T nSize = GlobalSize(hMem);
+
+        CPacket pack(6, pData, nSize);
+        CServerSocket::getInstance()->Send(pack);
+
+        GlobalUnlock(hMem);
+    }
+
+    pStream->Release();
+    GlobalFree(hMem);
+    screen.ReleaseDC();
+    
+ 
+    return 0;
+}
+```
+
+详细分析
+
+1. **创建`CImage`对象**:
+   ```cpp
+   CImage screen;
+   ```
+   创建一个`CImage`对象，它将用于存储屏幕的图像。
+
+2. **获取屏幕的设备上下文**:
+   ```cpp
+   HDC hScreen = ::GetDC(NULL);
+   ```
+   使用`GetDC`函数获取整个屏幕的设备上下文（DC）。传递`NULL`表示获取整个屏幕的DC。
+
+3. **获取屏幕分辨率和位深度**:
+   ```cpp
+   int nBitPerPixel = GetDeviceCaps(hScreen, BITSPIXEL);
+   int nWidth = GetDeviceCaps(hScreen, HORZRES);
+   int nHeigth = GetDeviceCaps(hScreen, VERTRES);
+   ```
+   通过调用`GetDeviceCaps`函数，获取屏幕的位深度（每像素的位数）、宽度和高度。
+
+4. **创建位图**:
+   ```cpp
+   screen.Create(nWidth, nHeigth, nBitPerPixel);
+   ```
+   使用`CImage`对象的`Create`方法创建一个新的位图，其尺寸和颜色深度与屏幕匹配。
+
+5. **复制屏幕内容到位图**:
+   ```cpp
+   BitBlt(screen.GetDC(), 0, 0, nWidth, nHeigth, hScreen, 0, 0, SRCCOPY);
+   ```
+   使用`BitBlt`函数，将屏幕的内容复制到前面创建的位图中。
+
+6. **释放屏幕的DC**:
+   ```cpp
+   ReleaseDC(NULL, hScreen);
+   ```
+   释放之前获取的屏幕DC，避免资源泄漏。
+
+7. **分配内存和创建流**:
+   ```cpp
+   HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+   IStream* pStream = NULL;
+   HRESULT ret = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+   ```
+   使用`GlobalAlloc`函数分配可移动的全局内存。接着，使用`CreateStreamOnHGlobal`函数创建一个基于全局内存的流对象。
+
+8. **保存位图到流**:
+   ```cpp
+   screen.Save(pStream, Gdiplus::ImageFormatPNG);
+   ```
+   使用`CImage`对象的`Save`方法将位图保存为PNG格式到之前创建的流中。
+
+9. **定位到流的起始位置**:
+   ```cpp
+   LARGE_INTEGER bg = { 0 };
+   pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+   ```
+   使用`Seek`方法将流的位置移动到起始位置。
+
+10. **获取内存地址和大小**:
+    ```cpp
+    PBYTE pData = (PBYTE)GlobalLock(hMem);
+    SIZE_T nSize = GlobalSize(hMem);
+    ```
+    使用`GlobalLock`函数锁定之前分配的内存，获取内存的起始地址和大小。
+
+11. **创建数据包并发送**:
+    ```cpp
+    CPacket pack(6, pData, nSize);
+    CServerSocket::getInstance()->Send(pack);
+    ```
+    创建一个`CPacket`对象，封装PNG图像数据，然后使用`CServerSocket`的`Send`方法发送这个数据包。
+
+12. **释放资源**:
+    ```cpp
+    GlobalUnlock(hMem);
+    pStream->Release();
+    GlobalFree(hMem);
+    ```
+    解锁和释放之前分配的全局内存，释放流对象。
+
+13. **释放`CImage`的DC**:
+    ```cpp
+    screen.ReleaseDC();
+    ```
+    调用`CImage`的`ReleaseDC`方法。但是，通常`CImage`会自动管理其DC，因此这一步可能不是必需的。
+
+14. **返回**:
+    ```cpp
+    return 0;
+    ```
+    函数成功执行后返回0。
+
+确保在实际使用中处理好错误条件，比如`GlobalAlloc`失败的情况，以及在`CServerSocket::Send`中可能出现的网络错误。此外，对于多显示器系统，你可能需要修改代码来处理每个显示器，而不是只捕获主显示器的屏幕。
