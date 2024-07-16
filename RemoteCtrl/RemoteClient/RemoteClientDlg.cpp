@@ -8,6 +8,8 @@
 #include "RemoteClientDlg.h"
 #include "afxdialogex.h"
 
+#include "ClientSocket.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -65,6 +67,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_BN_CLICKED(IDC_BUT_TEST, &CRemoteClientDlg::OnBnClickedButTest)
 END_MESSAGE_MAP()
 
 
@@ -114,7 +117,7 @@ void CRemoteClientDlg::OnSysCommand(UINT nID, LPARAM lParam)
 	else
 	{
 		CDialogEx::OnSysCommand(nID, lParam);
-	}
+	} 
 }
 
 // 如果向对话框添加最小化按钮，则需要下面的代码
@@ -151,5 +154,23 @@ void CRemoteClientDlg::OnPaint()
 HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 {
 	return static_cast<HCURSOR>(m_hIcon);
+}
+
+
+void CRemoteClientDlg::OnBnClickedButTest()
+{
+	CClientSocket* pClient = CClientSocket::getInstance();
+	bool ret = pClient->InitSokcet("127.0.0.1");
+	if (!ret) {
+		AfxMessageBox("网络初始化失败！");
+	}
+	CPacket pack(2024, NULL, 0);
+	pClient->Send(pack);
+
+	pClient->DealCommand();
+
+	TRACE("ack:%d\n", pClient->GetPacket().sCmd);
+
+	pClient->CloseSocket();
 }
 

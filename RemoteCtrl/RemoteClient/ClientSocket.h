@@ -1,17 +1,18 @@
 #pragma once
 
+#include <string>
+#include <vector>
 #include "pch.h"
 #include "framework.h"
 
 #pragma pack(push)
-#pragma pack(1)	//按照一字节对齐，解决CC的问题
+#pragma pack(1)
 
 class CPacket
 {
-public:
-	CPacket() :sHead(0), nLength(0), sCmd(0), sSum(0) {}
+public: 
+	CPacket() : sHead(0), nLength(0), sCmd(0), sSum(0) {}
 
-	//nSize 数据大小
 	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
 		sHead = 0xFEFF;
 		nLength = nSize + 4;
@@ -86,7 +87,7 @@ public:
 		nSize = 0;
 	}
 
-	~CPacket(){}
+	~CPacket() {}
 
 	CPacket& operator=(const CPacket& pack) {
 		if (this != &pack) {
@@ -111,18 +112,15 @@ public:
 		*(WORD*)pData = sCmd;	pData += 2;
 		memcpy(pData, strData.c_str(), strData.size());	pData += strData.size();
 		*(WORD*)pData = sSum;
-		return strOut.c_str(); 
+		return strOut.c_str();
 	}
 
 public:
-	//unsigned short	WORD
-	//unsigned long		DWORD
-
-	WORD sHead;		//固定为，0xFEFF							2
-	DWORD nLength;	//包长度 从控制命令开始，到和检验结束		4
-	WORD sCmd;		//控制命令								2
-	std::string strData;	//包数据							
-	WORD sSum;		//和校验	 校验包数据						2
+	WORD sHead;
+	DWORD nLength;
+	WORD sCmd;
+	std::string strData;
+	WORD sSum;
 	std::string strOut;
 };
 #pragma pack(pop)
@@ -137,70 +135,70 @@ typedef struct MouseEvent {
 	WORD nAction;	//点击0，双击1，按下2，放开3
 	WORD nButton;	//左键0，中键1，右键2
 	POINT ptXY;		//坐标
-}MOUSEEV, *PMOUSEEV;
+}MOUSEEV, * PMOUSEEV;
 
+//防止多次引用。
+std::string GetErrInfo(int wsaErrCode);
 
-class CServerSocket
+class CClientSocket
 {
 public:
-	static CServerSocket* getInstance() {
+	static CClientSocket* getInstance() {
 		if (m_instance == NULL) {
-			m_instance = new CServerSocket();
+			m_instance = new CClientSocket();
 		}
 		return m_instance;
 	}
 
-	bool InitSocket() {
-		if (serv_sock == -1)	return false;
-		sockaddr_in serv_addr;
-		serv_addr.sin_family = AF_INET;
-		serv_addr.sin_port = htons(9527);
-		serv_addr.sin_addr.s_addr = INADDR_ANY;
-
-		if (bind(serv_sock, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
+	//无限次调用
+	bool InitSokcet(const std::string& serverIPAddrness) {
+		if (cli_sock != INVALID_SOCKET) {
+			CloseSocket();
+		}
+		cli_sock = socket(PF_INET, SOCK_STREAM, 0);
+		if (cli_sock == -1) return false;
+		sockaddr_in server_addr;
+		server_addr.sin_family = AF_INET;
+		server_addr.sin_addr.s_addr = inet_addr(serverIPAddrness.c_str());
+		server_addr.sin_port = htons(9527);
+		
+		if (server_addr.sin_addr.s_addr == INADDR_NONE) {
+			AfxMessageBox(_T("指定的Ip地址不存在！"));
 			return false;
 		}
 
-		if (listen(serv_sock, 1) == -1) {
+		int ret = connect(cli_sock, (sockaddr*)&server_addr, sizeof(sockaddr));
+		
+		if (ret == -1) {
+			AfxMessageBox(_T("conncet连接失败！"));
+			TRACE("连接失败：%d %s\r\n", WSAGetLastError(), GetErrInfo(WSAGetLastError()).c_str());
 			return false;
 		}
-
-		return true;
-	}
-
-	bool AcceptClient() {
-		sockaddr_in cli_addr;
-		int cli_sz = sizeof(cli_addr);
-		cli_sock = accept(serv_sock, (sockaddr*)&cli_addr, &cli_sz);
-		if (cli_sock == -1)	return false;
 		return true;
 	}
 
 #define BUFFER_SIZE 4096
 
-	//获取命令
 	int DealCommand() {
 		if (cli_sock == -1) return -1;
-		//char buffer[1024] = "";
-		char* buffer = new char[BUFFER_SIZE];	//规定好，服务端接收客户端的数据，短连接。每次只会有一条指令
+		//客户端会收到服务端多个数据包
+		//char* buffer = new char[BUFFER_SIZE];
+		char* buffer = m_buffer.data();
 		memset(buffer, 0, sizeof(buffer));
-		size_t index = 0;		
+		size_t index = 0;
 		while (true) {
 			size_t len = recv(cli_sock, buffer + index, BUFFER_SIZE - index, 0);
 			if (len <= 0) {
-				delete[]buffer;
 				return -1;
 			}
 			index += len;
 			len = index;
 			m_packet = CPacket((BYTE*)buffer, len);
 
-			// TODO 
 			if (len > 0) {
-				//void *memmove(void *dest, const void *src, size_t n);
-				memmove(buffer, buffer + len, BUFFER_SIZE - len);
-				index -= len;				//可以理解为，前一次解包，未处理剩余字节的个位。
-				delete[]buffer;
+				memmove(buffer, buffer + index, BUFFER_SIZE - len);
+
+				index -= len;
 				return m_packet.sCmd;
 			}
 		}
@@ -214,8 +212,6 @@ public:
 
 	bool Send(CPacket& pack) {
 		if (cli_sock == -1) return false;
-		//(const char*)&pack 这种转换的目的是为了能够以字节流的形式访问 pack 实例中的数据。
-		//return send(cli_sock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0;
 		return send(cli_sock, pack.Data(), pack.Size(), 0) > 0;
 	}
 
@@ -240,39 +236,41 @@ public:
 		return m_packet;
 	}
 
-	void CloseClient() {
+	void CloseSocket() {
 		closesocket(cli_sock);
 		cli_sock = INVALID_SOCKET;
 	}
 
 private:
-	SOCKET serv_sock;
+	std::vector<char> m_buffer;
+
+	//类内声明
+	static CClientSocket* m_instance;
 	SOCKET cli_sock;
 	CPacket m_packet;
 	
 
-	CServerSocket& operator=(const CServerSocket& ss) {}
+	CClientSocket& operator=(const CClientSocket& ss) {}
 
 	//拷贝构造
-	CServerSocket(const CServerSocket& ss) {
-		serv_sock = ss.serv_sock;
+	CClientSocket(const CClientSocket& ss) {
 		cli_sock = ss.cli_sock;
 	}
 
-	//单例
-	CServerSocket() {
-		if (InitSockEnv() == FALSE){
+	CClientSocket() {
+		if (InitSockEnv() == FALSE) {
 			MessageBox(NULL, _T("无法初始化套接字环境"), _T("初始化错误！"), MB_OK | MB_ICONERROR);	// MB_ICONERROR消息框中会出现一个停止标志图标。
 			exit(0);
 		}
-		serv_sock = socket(PF_INET, SOCK_STREAM, 0);
-		cli_sock = INVALID_SOCKET;
-	};
+		//客户端需要在InitSock里面初始化cli_sock
+		//cli_sock = socket(PF_INET, SOCK_STREAM, 0);
+		m_buffer.resize(BUFFER_SIZE);
+	}
 
-	~CServerSocket() {
-		closesocket(serv_sock);
+	~CClientSocket() {
+		//closesocket(cli_sock);
 		WSACleanup();
-	};
+	}
 
 	BOOL InitSockEnv() {
 		WSADATA data;
@@ -281,28 +279,27 @@ private:
 		}
 		return TRUE;
 	}
-	
+
 	static void releaseInstance() {
 		if (m_instance != NULL) {
-			CServerSocket* temp = m_instance;
+			CClientSocket* temp = m_instance;
 			m_instance = nullptr;
 			delete temp;
 		}
 	}
 
-	//类内声明
-	static CServerSocket* m_instance;
-
-	class CHelper
+	class CHelper 
 	{
 	public:
 		CHelper() {
-			CServerSocket::getInstance();
+			CClientSocket::getInstance();
 		}
+
 		~CHelper() {
-			CServerSocket::releaseInstance();
+			CClientSocket::releaseInstance();
 		}
 	};
 
-	static CHelper m_helper;		// 静态成员变量:
+	static CHelper m_helper;
 };
+
