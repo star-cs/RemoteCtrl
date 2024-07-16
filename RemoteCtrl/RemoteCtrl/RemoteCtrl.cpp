@@ -34,10 +34,11 @@ int MakeDriverInfo() {
     std::string result;
     for (int i = 1; i <= 26; i++) {
         if (_chdrive(i) == 0) {
-            if (result.size() > 0) {
+            /*if (result.size() > 0) {
                 result += ',';
-            }
+            }*/
             result += 'A' + i - 1;
+            result += ',';
         }
     }
     
@@ -46,7 +47,7 @@ int MakeDriverInfo() {
     //Dump((BYTE*)&pack, pack.nLength + 6);       //FF FE 07 00 00 00 01 00 A0 31 11 B4 6F string数据传的是地址。
     Dump((BYTE*)pack.Data(), pack.Size());        //FF FE 07 00 00 00 01 00 43 2C 44 B3 00 
 
-    //CServerSocket::getInstance()->Send(pack);
+    CServerSocket::getInstance()->Send(pack);
     return 0;
 }
 

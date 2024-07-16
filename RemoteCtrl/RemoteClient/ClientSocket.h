@@ -151,7 +151,8 @@ public:
 	}
 
 	//无限次调用
-	bool InitSokcet(const std::string& serverIPAddrness) {
+	//bool InitSokcet(const std::string& serverIPAddrness) {
+	bool InitSokcet(int nIP, int nPort) {
 		if (cli_sock != INVALID_SOCKET) {
 			CloseSocket();
 		}
@@ -159,8 +160,12 @@ public:
 		if (cli_sock == -1) return false;
 		sockaddr_in server_addr;
 		server_addr.sin_family = AF_INET;
-		server_addr.sin_addr.s_addr = inet_addr(serverIPAddrness.c_str());
-		server_addr.sin_port = htons(9527);
+		//server_addr.sin_addr.s_addr = inet_addr(serverIPAddrness.c_str());
+		//server_addr.sin_port = htons(9527);
+		
+		//server_addr.sin_addr.s_addr = nIP;			//字节序问题！
+		server_addr.sin_addr.s_addr = htonl(nIP);	
+		server_addr.sin_port = htons(nPort);
 		
 		if (server_addr.sin_addr.s_addr == INADDR_NONE) {
 			AfxMessageBox(_T("指定的Ip地址不存在！"));
