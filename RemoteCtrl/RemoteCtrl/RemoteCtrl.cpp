@@ -100,7 +100,7 @@ int MakeDirectoryInfo() {
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
         
-        Sleep(1000);
+        Sleep(10);
     } while (!_findnext(hfind, &fdata)); 
 
     //空文件信息，标记结尾。
@@ -415,6 +415,27 @@ int UnlockMachine()
     return 0;
 }
 
+int DeleteFile()
+{
+    std::string filePath;
+    if (CServerSocket::getInstance()->GetFilePath(filePath) == false)
+    {
+        OutputDebugString(_T("当前的命令不是删除文件，命令解析错误！"));
+        return -1;
+    }
+
+    //::DeleteFile((LPCTSTR)filePath.c_str());
+    DeleteFile(filePath.c_str());
+
+    //成功后，回应。
+    CPacket pack(9, NULL, 0);
+    if (CServerSocket::getInstance()->Send(pack) == false) {
+        OutputDebugString(_T("发送失败"));
+        return -2;
+    }
+    return 0;
+}
+
 int TestConnect()
 {
     CPacket pack(2024, NULL, 0);
@@ -457,6 +478,10 @@ int ExcuteCommand(int nCmd)
     case 8:
         //解锁
         ret = UnlockMachine();
+        break;
+    case 9:
+        //删除文件
+        ret = DeleteFile();
         break;
     case 2024:
         //测试连接

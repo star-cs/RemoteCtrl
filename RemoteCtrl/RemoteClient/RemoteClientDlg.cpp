@@ -109,6 +109,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
+	ON_COMMAND(ID_DEL_FILE, &CRemoteClientDlg::OnDelFile)
 END_MESSAGE_MAP()
 
 
@@ -224,9 +225,9 @@ void CRemoteClientDlg::OnBnClickedButTest()
 	//TRACE("ack:%d\n", pClient->GetPacket().sCmd);
 
 	//pClient->CloseSocket();
-
 	SendCommandPacket(2024);
 }
+
 
 //获取磁盘信息
 void CRemoteClientDlg::OnBnClickedBtnFileinfo()
@@ -320,6 +321,7 @@ void CRemoteClientDlg::LoadFileInfo()
 	pClient->CloseSocket();
 }
 
+
 CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 {
 	CString strRet, strTemp;
@@ -334,6 +336,7 @@ CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 	return strRet;
 }
 
+
 //避免多次双击同一个节点，每次双击前都得清除掉节点的子节点。
 void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
 {
@@ -343,6 +346,7 @@ void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
 		if (hSub != NULL) m_tree.DeleteItem(hSub);
 	} while (hSub != NULL);
 }
+
 
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
@@ -393,7 +397,7 @@ void CRemoteClientDlg::OnDownloadFile()
 		strFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, 
 		NULL, this);
 
-	if (dlg.DoModal() == IDOK) {//模态
+	if (dlg.DoModal() == IDOK) {		// 模态
 
 		FILE* pFile = fopen(dlg.GetPathName(), "wb+");
 		if (pFile == NULL) {
@@ -443,5 +447,36 @@ void CRemoteClientDlg::OnDownloadFile()
 
 void CRemoteClientDlg::OnRunFile()
 {
+	int nListSelected = m_List.GetSelectionMark();
+	CString strPath = m_List.GetItemText(nListSelected, 0);
+
+	HTREEITEM filePath = m_tree.GetSelectedItem();
+	strPath = GetPath(filePath) + strPath;
+
+	int ret = SendCommandPacket(3, true, (BYTE*)(LPCSTR)strPath, strPath.GetLength());
+	if (ret != 3) {
+		AfxMessageBox("启动文件失败！");
+		TRACE("启动文件失败，ret = %d\r\n", ret);
+	}
+}
+
+
+void CRemoteClientDlg::OnDelFile()
+{
 	// TODO: 在此添加命令处理程序代码
+	int nListSelected = m_List.GetSelectionMark();
+	CString strPath = m_List.GetItemText(nListSelected, 0);
+
+	HTREEITEM filePath = m_tree.GetSelectedItem();
+	strPath = GetPath(filePath) + strPath;
+	int result = AfxMessageBox(_T("你确定要删除这个文件吗？"), MB_YESNO | MB_ICONQUESTION);
+	if (result == IDYES) {
+		int ret = SendCommandPacket(9, true, (BYTE*)(LPCSTR)strPath, strPath.GetLength());
+		if (ret != 9) {
+			AfxMessageBox("删除文件失败");
+			TRACE("删除文件失败，ret = %d\r\n", ret);
+			return;
+		}
+		m_List.DeleteItem(nListSelected);	//列表中删除对应item
+	}
 }

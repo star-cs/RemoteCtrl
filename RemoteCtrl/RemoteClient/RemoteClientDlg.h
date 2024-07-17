@@ -27,10 +27,16 @@ private:
 
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 
-	//1 查看磁盘分区
-	//2 查看指定目录下的文件
-	//3 打开文件
-	//4 下载文件（服务端文件传给客户端）
+	// 1 查看磁盘分区
+	// 2 查看指定目录下的文件
+	// 3 打开文件
+	// 4 下载文件（服务端文件传给客户端）
+	// 9 删除文件
+	// 5 鼠标操作
+	// 6 发送屏幕内容
+	// 7 锁机
+	// 8 解锁
+	// 2024 测试连接
 	//返回cmd，失败返回-1。
 	//默认，只接收一次数据就关闭连接。
 	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t nLength = 0);
@@ -59,4 +65,5 @@ public:
 	afx_msg void OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnDownloadFile();
 	afx_msg void OnRunFile();
+	afx_msg void OnDelFile();
 };
