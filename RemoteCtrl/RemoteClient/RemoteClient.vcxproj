@@ -206,6 +206,7 @@
     <ResourceCompile Include="RemoteClient.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="README.md" />
     <None Include="res\RemoteClient.rc2" />
   </ItemGroup>
   <ItemGroup>

@@ -23,6 +23,7 @@ void Dump(BYTE* pData, size_t nSize) {
     std::string strOut;
     for (size_t i = 0; i < nSize; i++) {
         char buf[8] = "";
+        if (i % 15 == 0) strOut += "\n";
         snprintf(buf, sizeof(buf), "%02X ", pData[i] & 0xFF);
         strOut += buf;
     }
@@ -54,19 +55,6 @@ int MakeDriverInfo() {
 #include <io.h>
 #include <list>
 
-typedef struct file_info {
-    file_info() {
-        IsInvalid = FALSE;
-        IsDirectory = -1;
-        HasNext = TRUE;
-        memset(szFileName, 0, sizeof(szFileName));
-    }
-    BOOL IsInvalid;         //是否有效
-    BOOL IsDirectory;       //是否为目录 0否 1是 -1无效（默认）
-    BOOL HasNext;           //是否还有后续 0没有 1有（默认）
-    char szFileName[256];   //文件名 
-}FILEINFO, *PFILEINFO;
-
 
 int MakeDirectoryInfo() {
     std::string strPath;
@@ -78,24 +66,27 @@ int MakeDirectoryInfo() {
 
     if (_chdir(strPath.c_str()) != 0) {
         FILEINFO finfo;
-        finfo.IsInvalid = TRUE;
-        finfo.IsDirectory = TRUE;
         finfo.HasNext = FALSE;
-        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
         //listFileInfos.push_back(finfo);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
-        if (CServerSocket::getInstance()->Send(pack) == false) {
-            OutputDebugString(_T("发送失败"));
-            return -4;
-        }
+
+        CServerSocket::getInstance()->Send(pack);
+        
         OutputDebugString(_T("没有权限，访问目录！"));
         return -2;
     }
 
     _finddata_t fdata;
-    int hfind = 0;
+    //int hfind = 0;        _findnext会报0xC0000005错误
+    long long hfind = 0;
     if ((hfind = _findfirst("*", &fdata)) == -1) {
         OutputDebugString(_T("没有找到任何文件！"));
+
+        FILEINFO finfo;
+        finfo.HasNext = FALSE;
+        CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::getInstance()->Send(pack);
+
         return -3;
     }
 
@@ -104,12 +95,10 @@ int MakeDirectoryInfo() {
         finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
         //finfo->IsInvalid = FALSE;
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
+        TRACE("%s\r\n", finfo.szFileName);
         //listFileInfos.push_back(finfo);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
-        if (CServerSocket::getInstance()->Send(pack) == false) {
-            OutputDebugString(_T("发送失败"));
-            return -4;
-        }
+        CServerSocket::getInstance()->Send(pack);
 
     } while (!_findnext(hfind, &fdata)); 
 
@@ -427,7 +416,6 @@ int UnlockMachine()
 
 int TestConnect()
 {
-
     CPacket pack(2024, NULL, 0);
     CServerSocket::getInstance()->Send(pack);
     return 0;

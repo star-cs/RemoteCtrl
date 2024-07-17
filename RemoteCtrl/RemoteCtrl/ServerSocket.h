@@ -6,6 +6,8 @@
 #pragma pack(push)
 #pragma pack(1)	//按照一字节对齐，解决CC的问题
 
+void Dump(BYTE* pData, size_t nSize);
+
 class CPacket
 {
 public:
@@ -139,6 +141,18 @@ typedef struct MouseEvent {
 	POINT ptXY;		//坐标
 }MOUSEEV, *PMOUSEEV;
 
+typedef struct file_info {
+	file_info() {
+		IsInvalid = FALSE;
+		IsDirectory = -1;
+		HasNext = TRUE;
+		memset(szFileName, 0, sizeof(szFileName));
+	}
+	BOOL IsInvalid;         //是否有效
+	BOOL IsDirectory;       //是否为目录 0否 1是 -1无效（默认）
+	BOOL HasNext;           //是否还有后续 0没有 1有（默认）
+	char szFileName[256];   //文件名 
+}FILEINFO, * PFILEINFO;
 
 class CServerSocket
 {
@@ -214,6 +228,7 @@ public:
 
 	bool Send(CPacket& pack) {
 		if (cli_sock == -1) return false;
+		Dump((BYTE*)pack.Data(), pack.Size());
 		//(const char*)&pack 这种转换的目的是为了能够以字节流的形式访问 pack 实例中的数据。
 		//return send(cli_sock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0;
 		return send(cli_sock, pack.Data(), pack.Size(), 0) > 0;
