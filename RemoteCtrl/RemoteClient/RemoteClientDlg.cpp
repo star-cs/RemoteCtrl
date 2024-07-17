@@ -107,6 +107,8 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 	ON_NOTIFY(NM_CLICK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMClickTreeDir)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
+	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
+	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
 END_MESSAGE_MAP()
 
 
@@ -226,7 +228,7 @@ void CRemoteClientDlg::OnBnClickedButTest()
 	SendCommandPacket(2024);
 }
 
-
+//获取磁盘信息
 void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 {
 	int ret = SendCommandPacket(1);
@@ -239,6 +241,8 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 
 	std::string dr;
 	m_tree.DeleteAllItems();
+	m_List.DeleteAllItems();
+
 	for (size_t i = 0; i < drives.size(); i++)
 	{
 		if (drives[i] == ',') {
@@ -275,7 +279,10 @@ void CRemoteClientDlg::LoadFileInfo()
 
 	PFILEINFO pFileInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	CClientSocket* pClient = CClientSocket::getInstance();
-	while (pFileInfo->HasNext) {
+	while (pFileInfo->HasNext) 
+	{
+		
+		TRACE("%s HasNext=%d IsDirectory=%d IsInvalid=%d \r\n", pFileInfo->szFileName, pFileInfo->HasNext, pFileInfo->IsDirectory, pFileInfo->IsInvalid);
 		if (pFileInfo->IsDirectory) {
 			//目录添加到左侧的树状里。
 			if (CString(pFileInfo->szFileName) == "." || (CString(pFileInfo->szFileName) == ".."))
@@ -285,7 +292,7 @@ void CRemoteClientDlg::LoadFileInfo()
 				if (cmd < 0) {
 					break;
 				}
-				pFileInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
+				pFileInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 				continue;
 			}
 			
@@ -298,7 +305,7 @@ void CRemoteClientDlg::LoadFileInfo()
 		}
 
 		int cmd = pClient->DealCommand();
-		TRACE("ack:%d\n", pClient->GetPacket().sCmd);
+		//TRACE("ack:%d\r\n", pClient->GetPacket().sCmd);
 		if (cmd < 0) {
 			break;
 		}
@@ -372,4 +379,69 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 	if (pPupup != NULL) {
 		pPupup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, ptMouse.x, ptMouse.y, this);
 	}
+}
+
+
+void CRemoteClientDlg::OnDownloadFile()
+{
+	// TODO: 在此添加命令处理程序代码
+	int nListSelected = m_List.GetSelectionMark();
+	CString strFile = m_List.GetItemText(nListSelected, 0);	// 0号位是列表item名
+	CClientSocket* pClient = CClientSocket::getInstance();
+
+	CFileDialog dlg(FALSE, "*", 
+		strFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, 
+		NULL, this);
+
+	if (dlg.DoModal() == IDOK) {//模态
+
+		FILE* pFile = fopen(dlg.GetPathName(), "wb+");
+		if (pFile == NULL) {
+			AfxMessageBox("没有权限保存该文件，或者文件无法创建！！！");
+			return;
+		}
+
+		HTREEITEM hSelected = m_tree.GetSelectedItem();
+		strFile = GetPath(hSelected) + strFile;
+		TRACE("%s\r\n", LPCSTR(strFile));
+
+		// CString --> LPCSTR --> BYTE*
+		int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+		do {
+			if (ret < 0) {
+				AfxMessageBox("执行下载命令失败！");
+				TRACE("执行下载命令失败，ret = %d\r\n", ret);
+				break;
+			}
+
+			long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
+			if (nLength == 0) {
+				AfxMessageBox("文件长度为零，或者无法读取文件！！！");
+				break;
+			}
+
+			long long nCount = 0;
+			while (nCount < nLength)
+			{
+				ret = pClient->DealCommand();
+				if (ret < 0) {
+					AfxMessageBox("传输失败！！！");
+					TRACE("传输失败！！！，ret = %d\r\n", ret);
+					break;
+				}
+
+				fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
+
+				nCount += pClient->GetPacket().strData.size();
+			}
+		} while (0);
+		fclose(pFile);
+		pClient->CloseSocket();
+	}
+}
+
+
+void CRemoteClientDlg::OnRunFile()
+{
+	// TODO: 在此添加命令处理程序代码
 }

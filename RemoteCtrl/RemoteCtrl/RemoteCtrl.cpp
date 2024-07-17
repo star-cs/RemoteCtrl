@@ -95,11 +95,12 @@ int MakeDirectoryInfo() {
         finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
         //finfo->IsInvalid = FALSE;
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
-        TRACE("%s\r\n", finfo.szFileName);
+        TRACE("%s HasNext=%d IsDirectory=%d IsInvalid=%d \r\n", finfo.szFileName, finfo.HasNext, finfo.IsDirectory, finfo.IsInvalid);
         //listFileInfos.push_back(finfo);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
-
+        
+        Sleep(1000);
     } while (!_findnext(hfind, &fdata)); 
 
     //空文件信息，标记结尾。
