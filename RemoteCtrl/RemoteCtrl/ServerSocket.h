@@ -228,7 +228,7 @@ public:
 
 	bool Send(CPacket& pack) {
 		if (cli_sock == -1) return false;
-		Dump((BYTE*)pack.Data(), pack.Size());
+		//Dump((BYTE*)pack.Data(), pack.Size());
 		//(const char*)&pack 这种转换的目的是为了能够以字节流的形式访问 pack 实例中的数据。
 		//return send(cli_sock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0;
 		return send(cli_sock, pack.Data(), pack.Size(), 0) > 0;

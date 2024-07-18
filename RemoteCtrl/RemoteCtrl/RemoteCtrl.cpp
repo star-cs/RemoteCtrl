@@ -63,7 +63,7 @@ int MakeDirectoryInfo() {
         OutputDebugString(_T("当前的命令不是获取文件列表，命令解析错误！"));
         return -1;
     }
-
+    
     if (_chdir(strPath.c_str()) != 0) {
         FILEINFO finfo;
         finfo.HasNext = FALSE;
@@ -89,26 +89,28 @@ int MakeDirectoryInfo() {
 
         return -3;
     }
-
+    int count = 0;
     do {
         FILEINFO finfo;
         finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
         //finfo->IsInvalid = FALSE;
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
-        TRACE("%s HasNext=%d IsDirectory=%d IsInvalid=%d \r\n", finfo.szFileName, finfo.HasNext, finfo.IsDirectory, finfo.IsInvalid);
+        TRACE("[服务器]%s HasNext=%d IsDirectory=%d IsInvalid=%d \r\n", finfo.szFileName, finfo.HasNext, finfo.IsDirectory, finfo.IsInvalid);
         //listFileInfos.push_back(finfo);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
+        count++;
         
-        Sleep(10);
+        //Sleep(10);
     } while (!_findnext(hfind, &fdata)); 
+    TRACE("[服务器]file_count = %d\n", count);
 
     //空文件信息，标记结尾。
     FILEINFO finfo;
     finfo.HasNext = FALSE;
     CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
     if (CServerSocket::getInstance()->Send(pack) == false) {
-        OutputDebugString(_T("发送失败"));
+        OutputDebugString(_T("发送失败\n"));
         return -4;
     }
 
@@ -333,7 +335,7 @@ unsigned threadId = 0;
 
 unsigned __stdcall threadLockDig(void* arg) 
 {
-    TRACE("%s(%d):%d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
+    TRACE("[服务器]%s(%d):%d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
     //非模态
     dlg.Create(IDD_DIALOG_INFO, NULL);
 
@@ -367,7 +369,7 @@ unsigned __stdcall threadLockDig(void* arg)
         TranslateMessage(&msg);
         DispatchMessage(&msg);
         if (msg.message == WM_KEYDOWN) {
-            TRACE("msg:%08X wparam:%08X lparam:%08X\r\n", msg.message, msg.wParam, msg.lParam);
+            TRACE("[服务器]msg:%08X wparam:%08X lparam:%08X\r\n", msg.message, msg.wParam, msg.lParam);
             if (msg.wParam == 0x41) { //Esc（1B） A（0x41）
                 break;
             }
@@ -393,7 +395,7 @@ int LockMachine()
     if (dlg.m_hWnd == NULL || dlg.m_hWnd == INVALID_HANDLE_VALUE) {
         //_beginthread(threadLockDig, 0, NULL);
         _beginthreadex(NULL, 0, threadLockDig, NULL, 0, &threadId);
-        TRACE("%s(%d):%d\r\n", __FUNCTION__, __LINE__, threadId);
+        TRACE("[服务器]%s(%d):%d\r\n", __FUNCTION__, __LINE__, threadId);
     }
 
     CPacket pack(7, NULL, 0);
@@ -531,7 +533,7 @@ int main()
                 if (ret > 0) {
                     ret = ExcuteCommand(ret);
                     if (ret != 0) {
-                        TRACE("执行命令失败，%d ret=%d\r\n", pserver->GetPacket().sCmd, ret);
+                        TRACE("[服务器]执行命令失败，%d ret=%d\r\n", pserver->GetPacket().sCmd, ret);
                     }  
                     //短连接
                     pserver->CloseClient();

@@ -8,6 +8,9 @@
 #pragma pack(push)
 #pragma pack(1)
 
+void Dump(BYTE* pData, size_t nSize);
+
+
 class CPacket
 {
 public: 
@@ -68,6 +71,7 @@ public:
 		if (nLength > 4) {
 			strData.resize(nLength - 2 - 2);
 			memcpy((void*)strData.c_str(), pData + i, nLength - 4);
+			TRACE("[客户端]%s\r\n", strData.c_str() + 12);
 			i += nLength - 4;
 		}
 
@@ -190,7 +194,7 @@ public:
 		
 		if (ret == -1) {
 			AfxMessageBox(_T("conncet连接失败！"));
-			TRACE("连接失败：%d %s\r\n", WSAGetLastError(), GetErrInfo(WSAGetLastError()).c_str());
+			TRACE("[客户端]连接失败：%d %s\r\n", WSAGetLastError(), GetErrInfo(WSAGetLastError()).c_str());
 			return false;
 		}
 		return true;
@@ -203,20 +207,27 @@ public:
 		//客户端会收到服务端多个数据包
 		//char* buffer = new char[BUFFER_SIZE];
 		char* buffer = m_buffer.data();
-		memset(buffer, 0, sizeof(buffer));
-		size_t index = 0;
+
+		//处理完一个文件命令之后，index一定会回到0。如果后续再次点击文件发生错误，那么就是上一次的命令出现了bug
+		//某几个参数写错了的话，bug得找半天。
+		static size_t index = 0;		
 		while (true) {
 			size_t len = recv(cli_sock, buffer + index, BUFFER_SIZE - index, 0);
-			if (len <= 0) {
+			TRACE("[客户端]index = %d len = %d buffer_size = %d\n", index, len, index + len);
+
+			// 1. 之前buffer，index局部置零，会间接性的丢数据。
+			// 2. 特别是，index不为0的情况下，（可能最后几个包一起接收到了，再后几次的recv会为0，index还有数据）。
+			if (len <= 0 && index == 0) {
 				return -1;
 			}
 			index += len;
 			len = index;
+			
+			Dump((BYTE*)buffer, len);
 			m_packet = CPacket((BYTE*)buffer, len);
-
+			
 			if (len > 0) {
-				memmove(buffer, buffer + index, BUFFER_SIZE - len);
-
+				memmove(buffer, buffer + len, index - len);
 				index -= len;
 				return m_packet.sCmd;
 			}
@@ -284,6 +295,7 @@ private:
 		//客户端需要在InitSock里面初始化cli_sock
 		//cli_sock = socket(PF_INET, SOCK_STREAM, 0);
 		m_buffer.resize(BUFFER_SIZE);
+		memset(m_buffer.data(), 0, BUFFER_SIZE);
 	}
 
 	~CClientSocket() {

@@ -88,7 +88,7 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd,bool bAutoClose, BYTE* pData, s
 
 	int cmd = pClient->DealCommand();
 
-	TRACE("ack:%d\n", pClient->GetPacket().sCmd);
+	TRACE("[客户端]ack:%d\n", pClient->GetPacket().sCmd);
 
 	//获取文件夹信息暂时不关闭
 	if (bAutoClose) {
@@ -249,7 +249,7 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 		if (drives[i] == ',') {
 			dr += ":";
 			HTREEITEM hTemp =m_tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
-			m_tree.InsertItem("", hTemp, TVI_LAST);
+			//m_tree.InsertItem("", hTemp, TVI_LAST);
 			dr.clear();
 			continue;
 		}
@@ -268,8 +268,8 @@ void CRemoteClientDlg::LoadFileInfo()
 		return;
 	}
 
-	if (m_tree.GetChildItem(hTreeSelected) == NULL)	//没有默认的空节点，说明是一个文件。
-		return;
+	//if (m_tree.GetChildItem(hTreeSelected) == NULL)	//没有默认的空节点，说明是一个文件。
+	//	return;
 
 	DeleteTreeChildrenItem(hTreeSelected);
 	m_List.DeleteAllItems();
@@ -280,10 +280,10 @@ void CRemoteClientDlg::LoadFileInfo()
 
 	PFILEINFO pFileInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	CClientSocket* pClient = CClientSocket::getInstance();
+	int count = 0;
 	while (pFileInfo->HasNext) 
 	{
-		
-		TRACE("%s HasNext=%d IsDirectory=%d IsInvalid=%d \r\n", pFileInfo->szFileName, pFileInfo->HasNext, pFileInfo->IsDirectory, pFileInfo->IsInvalid);
+		TRACE("[客户端] FileName = [%s] HasNext=%d IsDirectory=%d IsInvalid=%d \r\n", pFileInfo->szFileName, pFileInfo->HasNext, pFileInfo->IsDirectory, pFileInfo->IsInvalid);
 		if (pFileInfo->IsDirectory) {
 			//目录添加到左侧的树状里。
 			if (CString(pFileInfo->szFileName) == "." || (CString(pFileInfo->szFileName) == ".."))
@@ -304,7 +304,7 @@ void CRemoteClientDlg::LoadFileInfo()
 			//文件添加到右侧的列表中。
 			m_List.InsertItem(0, pFileInfo->szFileName);
 		}
-
+		count++;
 		int cmd = pClient->DealCommand();
 		//TRACE("ack:%d\r\n", pClient->GetPacket().sCmd);
 		if (cmd < 0) {
@@ -312,13 +312,8 @@ void CRemoteClientDlg::LoadFileInfo()
 		}
 		pFileInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	}
-
-	/*CClientSocket* pClient = CClientSocket::getInstance();
-	while (pFileInfo->HasNext) {
-		int cmd = pClient->DealCommand();
-		TRACE("ack:%d\n", pClient->GetPacket().sCmd);
-	}*/
 	pClient->CloseSocket();
+	TRACE("[客户端]file_count = %d\n", count);
 }
 
 
@@ -407,7 +402,7 @@ void CRemoteClientDlg::OnDownloadFile()
 
 		HTREEITEM hSelected = m_tree.GetSelectedItem();
 		strFile = GetPath(hSelected) + strFile;
-		TRACE("%s\r\n", LPCSTR(strFile));
+		TRACE("[客户端]%s\r\n", LPCSTR(strFile));
 
 		// CString --> LPCSTR --> BYTE*
 		int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
