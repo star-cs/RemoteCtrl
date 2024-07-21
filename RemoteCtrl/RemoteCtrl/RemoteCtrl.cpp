@@ -323,7 +323,7 @@ int SendScreen()
     GlobalFree(hMem);
     screen.ReleaseDC();
     
- 
+
     return 0;
 }
 
@@ -408,7 +408,7 @@ int UnlockMachine()
 {
     //dlg.SendMessage(WM_KEYDOWN, 0x41, 001E0001);
     //::SendMessage(dlg.m_hWnd, WM_KEYDOWN, 0x41, 001E0001);
-    //发向特定的线程 消息。
+    //这里是 winapi，从main创建一个线程。需要 向特定的线程 发消息。
     PostThreadMessage(threadId, WM_KEYDOWN, 0x41, 001E0001);
   
     CPacket pack(8, NULL, 0);
