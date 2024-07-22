@@ -19,11 +19,31 @@ public:
 	enum { IDD = IDD_REMOTECLIENT_DIALOG };
 #endif
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
+	
+public:
+	bool isFull() const {
+		return m_isFull;
+	}
+
+	CImage& getImage() {
+		return m_image;
+	}
+
+	void setImageStatus(bool isFull = false) {
+		m_isFull = isFull;
+	}
 
 private:
-	static void threadForDownloadFile(void* arg);
+	CImage m_image; // 截图缓存。
+	bool m_isFull;	// 缓存是否填充
+
+private:
+	static void threadEntryForWatchData(void* arg);
+	void threadWatchData();
+
+	static void threadEntryForDownloadFile(void* arg);
 	void threadDownFile();
 
 	void LoadFileInfo();
@@ -73,4 +93,5 @@ public:
 	afx_msg void OnRunFile();
 	afx_msg void OnDelFile();
 	afx_msg LRESULT OnSendMessage(WPARAM wParam, LPARAM lParam);
+	afx_msg void OnBnClickedBtnStartWatch();
 };
