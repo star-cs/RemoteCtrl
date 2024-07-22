@@ -79,15 +79,12 @@ void CRemoteClientDlg::threadEntryForWatchData(void* arg)
 
 void CRemoteClientDlg::threadWatchData()
 {
+	Sleep(50);
 	CClientSocket* pClient = CClientSocket::getInstance();
 
+	MSG msg;
 	for (;;) {
-		ULONGLONG tick = GetTickCount64();
-
-		if (GetTickCount64() - tick < 50) {
-			Sleep(GetTickCount64() - tick);
-		}
-
+		
 		if (m_isFull == false) {
 			//每发一次命令，接收一次截图
 			int ret = SendMessage(WM_SEND_PACKET, 6 << 1 | 1, NULL);
