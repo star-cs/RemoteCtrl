@@ -314,7 +314,7 @@ int SendScreen()
         SIZE_T nSize = GlobalSize(hMem);
 
         CPacket pack(6, pData, nSize);
-           CServerSocket::getInstance()->Send(pack);
+        CServerSocket::getInstance()->Send(pack);
 
         GlobalUnlock(hMem);
     }
@@ -323,7 +323,6 @@ int SendScreen()
     GlobalFree(hMem);
     screen.ReleaseDC();
     
-
     return 0;
 }
 

@@ -39,7 +39,7 @@ private:
 	CImage m_image; // 截图缓存。
 	bool m_isFull;	// 缓存是否填充
 
-private:
+public:
 	static void threadEntryForWatchData(void* arg);
 	void threadWatchData();
 

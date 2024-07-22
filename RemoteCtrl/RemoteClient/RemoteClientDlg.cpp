@@ -82,7 +82,6 @@ void CRemoteClientDlg::threadWatchData()
 	Sleep(50);
 	CClientSocket* pClient = CClientSocket::getInstance();
 
-	MSG msg;
 	for (;;) {
 		
 		if (m_isFull == false) {
@@ -583,9 +582,6 @@ LRESULT CRemoteClientDlg::OnSendMessage(WPARAM wParam, LPARAM lParam)
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
 	CWatchDlg dlg(this);
-
 	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
-
 	dlg.DoModal();			//模态，保证这个按钮不会被反复点击。
-
 }

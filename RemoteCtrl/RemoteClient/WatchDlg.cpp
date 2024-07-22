@@ -28,9 +28,34 @@ void CWatchDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_WATCH, m_image);
 }
 
+CPoint CWatchDlg::UserPoint2ScreenPoint(CPoint& point)
+{
+	m_image.ScreenToClient(&point);
+
+	CRect clientRect;
+	m_image.GetWindowRect(clientRect);
+
+	int width = clientRect.Width();
+	int Height = clientRect.Height();
+
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+	int tarWidth = pPersent->getImage().GetWidth();
+	int tarHeight = pPersent->getImage().GetHeight();
+
+	return CPoint(point.x / width * tarWidth, point.y / Height * tarHeight);
+}
+
 
 BEGIN_MESSAGE_MAP(CWatchDlg, CDialogEx)
 	ON_WM_TIMER()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONDBLCLK()
+	ON_WM_RBUTTONDOWN()
+	ON_WM_RBUTTONDBLCLK()
+	ON_WM_LBUTTONUP()
+	ON_WM_RBUTTONUP()
+	ON_WM_MOVE()
+	ON_STN_CLICKED(IDC_WATCH, &CWatchDlg::OnStnClickedWatch)
 END_MESSAGE_MAP()
 
 
@@ -76,3 +101,143 @@ void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 
 	CDialogEx::OnTimer(nIDEvent);
 }
+
+
+
+void CWatchDlg::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	/*CPoint cur = UserPoint2ScreenPoint(point);
+
+	MOUSEEV m_mouse;
+	m_mouse.nAction = 3;
+	m_mouse.nButton = 0;
+	m_mouse.ptXY = cur;
+
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	int ret = pPersent->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(MOUSEEV));*/
+
+	CDialogEx::OnLButtonDown(nFlags, point);
+}
+
+void CWatchDlg::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	/*CPoint cur = UserPoint2ScreenPoint(point);
+
+	MOUSEEV m_mouse;
+	m_mouse.nAction = 2;
+	m_mouse.nButton = 0;
+	m_mouse.ptXY = cur;
+
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	int ret = pPersent->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(MOUSEEV));*/
+
+
+	CDialogEx::OnLButtonUp(nFlags, point);
+}
+
+
+void CWatchDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	CPoint cur = UserPoint2ScreenPoint(point);
+
+	MOUSEEV m_mouse;
+	m_mouse.nAction = 1;
+	m_mouse.nButton = 0;
+	m_mouse.ptXY = cur;
+
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	int ret = pPersent->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(MOUSEEV));
+
+	CDialogEx::OnLButtonDblClk(nFlags, point);
+}
+
+void CWatchDlg::OnStnClickedWatch()
+{
+	CPoint point;
+	GetCursorPos(&point);
+	CPoint cur = UserPoint2ScreenPoint(point);
+
+	MOUSEEV m_mouse;
+	m_mouse.nAction = 0;
+	m_mouse.nButton = 0;
+	m_mouse.ptXY = cur;
+
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	int ret = pPersent->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(MOUSEEV));
+
+}
+
+void CWatchDlg::OnRButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	CPoint cur = UserPoint2ScreenPoint(point);
+
+	MOUSEEV m_mouse;
+	m_mouse.nAction = 2;
+	m_mouse.nButton = 2;
+	m_mouse.ptXY = cur;
+
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	int ret = pPersent->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(MOUSEEV));
+
+	CDialogEx::OnRButtonDown(nFlags, point);
+}
+
+void CWatchDlg::OnRButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	CPoint cur = UserPoint2ScreenPoint(point);
+
+	MOUSEEV m_mouse;
+	m_mouse.nAction = 3;
+	m_mouse.nButton = 2;
+	m_mouse.ptXY = cur;
+
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	int ret = pPersent->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(MOUSEEV));
+
+	CDialogEx::OnRButtonUp(nFlags, point);
+}
+
+void CWatchDlg::OnRButtonDblClk(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	CPoint cur = UserPoint2ScreenPoint(point);
+
+	MOUSEEV m_mouse;
+	m_mouse.nAction = 1;
+	m_mouse.nButton = 2;
+	m_mouse.ptXY = cur;
+
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	int ret = pPersent->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(MOUSEEV));
+
+	CDialogEx::OnRButtonDblClk(nFlags, point);
+}
+
+
+
+void CWatchDlg::OnMove(int x, int y)
+{
+	CPoint cur = UserPoint2ScreenPoint(CPoint(x,y));
+
+	MOUSEEV m_mouse;
+	m_mouse.nAction = -1;
+	m_mouse.nButton = 3;
+	m_mouse.ptXY = cur;
+
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	int ret = pPersent->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(MOUSEEV));
+
+	CDialogEx::OnMove(x, y);
+}
+
+
