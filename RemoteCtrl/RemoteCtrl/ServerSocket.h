@@ -137,7 +137,7 @@ typedef struct MouseEvent {
 		ptXY.y = 0;
 	}
 	WORD nAction;	//µã»÷0£¬Ë«»÷1£¬°´ÏÂ2£¬·Å¿ª3
-	WORD nButton;	//×ó¼ü0£¬ÖÐ¼ü1£¬ÓÒ¼ü2
+	WORD nButton;	//×ó¼ü0£¬ÓÒ¼ü1£¬ÖÐ¼ü2
 	POINT ptXY;		//×ø±ê
 }MOUSEEV, *PMOUSEEV;
 
@@ -172,6 +172,7 @@ public:
 		serv_addr.sin_addr.s_addr = INADDR_ANY;
 
 		if (bind(serv_sock, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
+			printf("%d\r\n", GetLastError());
 			return false;
 		}
 
@@ -264,7 +265,6 @@ private:
 	SOCKET serv_sock;
 	SOCKET cli_sock;
 	CPacket m_packet;
-	
 
 	CServerSocket& operator=(const CServerSocket& ss) {}
 

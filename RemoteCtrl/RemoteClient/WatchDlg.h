@@ -23,7 +23,9 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
-	CPoint UserPoint2ScreenPoint(CPoint& point);
+	CPoint UserPoint2ScreenPoint(CPoint& point, bool isScreen = false);
+
+	int tarHeight, tarWidth;
 
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	virtual BOOL OnInitDialog();
@@ -34,6 +36,7 @@ public:
 	afx_msg void OnRButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
-	afx_msg void OnMove(int x, int y);
 	afx_msg void OnStnClickedWatch();
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	virtual void OnOK();
 };

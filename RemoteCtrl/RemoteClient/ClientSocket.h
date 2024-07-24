@@ -71,7 +71,7 @@ public:
 		if (nLength > 4) {
 			strData.resize(nLength - 2 - 2);
 			memcpy((void*)strData.c_str(), pData + i, nLength - 4);
-			TRACE("[客户端]%s\r\n", strData.c_str() + 12);
+			//TRACE("[客户端]%s\r\n", strData.c_str() + 12);
 			i += nLength - 4;
 		}
 
@@ -150,8 +150,8 @@ typedef struct MouseEvent {
 		ptXY.x = 0;
 		ptXY.y = 0;
 	}
-	WORD nAction;	//点击0，双击1，按下2，放开3
-	WORD nButton;	//左键0，中键1，右键2
+	WORD nAction;	//点击0，双击1，按下2，放开3，无操作4，滚轮上滑5，滚轮下滑6
+	WORD nButton;	//左键0，右键1，中键2
 	POINT ptXY;		//坐标
 }MOUSEEV, * PMOUSEEV;
 
@@ -200,7 +200,7 @@ public:
 		return true;
 	}
 
-#define BUFFER_SIZE 4096000
+#define BUFFER_SIZE 40960000
 
 	int DealCommand() {
 		if (cli_sock == -1) return -1;
@@ -223,7 +223,7 @@ public:
 			index += len;
 			len = index;
 			
-			Dump((BYTE*)buffer, len);
+			//Dump((BYTE*)buffer, len);
 			m_packet = CPacket((BYTE*)buffer, len);
 			
 			if (len > 0) {

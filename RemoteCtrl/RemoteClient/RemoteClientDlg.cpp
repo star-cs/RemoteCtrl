@@ -82,7 +82,7 @@ void CRemoteClientDlg::threadWatchData()
 	Sleep(50);
 	CClientSocket* pClient = CClientSocket::getInstance();
 
-	for (;;) {
+	while(!m_isClose){
 		
 		if (m_isFull == false) {
 			//每发一次命令，接收一次截图
@@ -96,6 +96,7 @@ void CRemoteClientDlg::threadWatchData()
 					Sleep(1);
 					continue;
 				}
+
 				IStream* pStream = NULL;
 				HRESULT ret = CreateStreamOnHGlobal(hMen, TRUE, &pStream);
 				if (ret == S_OK) {
@@ -104,12 +105,15 @@ void CRemoteClientDlg::threadWatchData()
 					LARGE_INTEGER bg = { 0 };
 					pStream->Seek(bg, STREAM_SEEK_SET, NULL);
 
-					m_image.Load(pStream);
+					if(! m_image.IsNull() )
+						m_image.Destroy();
 
+					m_image.Load(pStream);
+						
 					m_isFull = true;
 				}
 				pStream->Release();
-				GlobalFree(hMen);
+				GlobalFree(hMen); 
 			}
 			else {
 				//没发送成功就睡眠，防止CPU持续跑满
@@ -297,7 +301,9 @@ BOOL CRemoteClientDlg::OnInitDialog()
 
 	// TODO: 在此添加额外的初始化代码
 	UpdateData();
-	m_server_address = 0x7F000001;
+	//m_server_address = 0x7F000001;
+	//192.168.56.1
+	m_server_address = 0xc0a83865;
 	m_nPort = _T("9527");
 	UpdateData(FALSE);
 	
@@ -565,23 +571,36 @@ void CRemoteClientDlg::OnDelFile()
 //消息响应
 LRESULT CRemoteClientDlg::OnSendMessage(WPARAM wParam, LPARAM lParam)
 {
-	int ret = -1;
-	if (lParam == NULL) {
-		//	6 屏幕监控命令发送
-		ret = SendCommandPacket(wParam >> 1, wParam & 1, NULL, 0);
-	}
-	else { 
-		//  4 下载文件命令发送
+	int ret = 0;
+	int cmd = wParam >> 1;
+
+	switch (cmd) {
+	case 4:
+	{
 		CString strFile = (LPCSTR)lParam;
-		ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+		ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
 	}
+		break;
+	case 5:
+		ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSEEV));
+		break;
+	case 6:
+		ret = SendCommandPacket(cmd, wParam & 1);
+		break;
+	default:
+		ret = -1;
+	}
+
 	return ret;
 }
 
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
+	m_isClose = false;
 	CWatchDlg dlg(this);
-	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
+	HANDLE hThread = (HANDLE)_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
 	dlg.DoModal();			//模态，保证这个按钮不会被反复点击。
+	m_isClose = true;		//使得线程退出while循环
+	WaitForSingleObject(hThread, 500);
 }
