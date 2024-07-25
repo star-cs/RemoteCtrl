@@ -57,6 +57,10 @@ BEGIN_MESSAGE_MAP(CWatchDlg, CDialogEx)
 	ON_STN_CLICKED(IDC_WATCH, &CWatchDlg::OnStnClickedWatch)
 	ON_WM_MOUSEMOVE()
 	ON_WM_MOUSEWHEEL()
+	ON_BN_CLICKED(IDC_BTN_LOCK, &CWatchDlg::OnBnClickedBtnLock)
+	ON_BN_CLICKED(IDC_BTN_UNLOCK, &CWatchDlg::OnBnClickedBtnUnlock)
+	ON_COMMAND(ID_LOCK_BTN, &CWatchDlg::OnLockBtn)
+	ON_COMMAND(ID_UNLOCK_BTN, &CWatchDlg::OnUnlockBtn)
 END_MESSAGE_MAP()
 
 
@@ -65,13 +69,22 @@ END_MESSAGE_MAP()
 BOOL CWatchDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
-
-	// TODO:  在此添加额外的初始化
-	MoveWindow(0, 0, 1920, 1080 + 50 );
-	CenterWindow();
-	m_image.MoveWindow(0, 0, 1920, 1080);
+	
+	//// TODO:  在此添加额外的初始化
+	//MoveWindow(0, 80, 1920, 1080 + 80);
+	//CenterWindow();
+	//m_image.MoveWindow(0, 80, 1920, 1080);
 
 	SetTimer(0, 45, NULL);		//nIDEvent，频率50ms，回调函数
+
+	//CButton* pButton1 = (CButton*)GetDlgItem(IDC_BTN_LOCK);
+	//CButton* pButton2 = (CButton*)GetDlgItem(IDC_BTN_UNLOCK);
+
+	//CRect rect1(0, 0, 80, 30);
+	//CRect rect2(100, 0, 100 + 80, 30);
+
+	//pButton1->MoveWindow(&rect1);
+	//pButton2->MoveWindow(&rect2);
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 	// 异常: OCX 属性页应返回 FALSE
@@ -277,4 +290,41 @@ void CWatchDlg::OnOK()
 	// TODO: 在此添加专用代码和/或调用基类
 
 	//CDialogEx::OnOK();
+}
+
+
+void CWatchDlg::OnBnClickedBtnLock()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	pPersent->SendMessage(WM_SEND_PACKET, 7 << 1 | 1);
+}
+
+
+void CWatchDlg::OnBnClickedBtnUnlock()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	pPersent->SendMessage(WM_SEND_PACKET, 8 << 1 | 1);
+}
+
+
+
+
+
+void CWatchDlg::OnLockBtn()
+{
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	pPersent->SendMessage(WM_SEND_PACKET, 7 << 1 | 1);
+}
+
+
+void CWatchDlg::OnUnlockBtn()
+{
+	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+
+	pPersent->SendMessage(WM_SEND_PACKET, 8 << 1 | 1);
 }

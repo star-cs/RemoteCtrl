@@ -47,6 +47,7 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 }
 
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
+
 END_MESSAGE_MAP()
 
 // CRemoteClientDlg 对话框
@@ -585,6 +586,8 @@ LRESULT CRemoteClientDlg::OnSendMessage(WPARAM wParam, LPARAM lParam)
 		ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSEEV));
 		break;
 	case 6:
+	case 7:
+	case 8:
 		ret = SendCommandPacket(cmd, wParam & 1);
 		break;
 	default:
@@ -604,3 +607,5 @@ void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 	m_isClose = true;		//使得线程退出while循环
 	WaitForSingleObject(hThread, 500);
 }
+
+

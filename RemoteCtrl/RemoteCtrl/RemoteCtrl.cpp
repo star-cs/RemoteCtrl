@@ -265,10 +265,10 @@ int MouseEvent() {
             mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
             break;
 
-        //case 0x08://仅鼠标移动
-        //    mouse_event(MOUSEEVENTF_MOVE, mouse.ptXY.x, mouse.ptXY.y, 0, GetMessageExtraInfo());
-        //    break;
-
+            //case 0x08://仅鼠标移动
+            //    mouse_event(MOUSEEVENTF_MOVE, mouse.ptXY.x, mouse.ptXY.y, 0, GetMessageExtraInfo());
+            //    break;
+        }
 
         //结束标记
         CPacket pack(5, NULL, 0);
@@ -348,9 +348,25 @@ unsigned __stdcall threadLockDig(void* arg)
     rect.left = 0;
     rect.top = 0;
     rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
-    rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN) + 20;
+    rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);
+
+    rect.bottom = LONG(rect.bottom * 1.08);
 
     dlg.MoveWindow(rect);
+
+    // 提示
+    CWnd* pText = dlg.GetDlgItem(IDC_STATIC);
+    if (pText) {
+        CRect rtText;
+        pText->GetWindowRect(rtText);
+        int nWidth = rtText.Width() / 2;
+        int nHeight = rtText.Height() / 2;
+        int x = (rect.right - nWidth) / 2;
+        int y = (rect.bottom - nHeight) / 2;
+
+        pText->MoveWindow(x, y, rtText.Width(), rtText.Height());
+        pText->SetWindowText(_T("请联系管理员解锁"));
+    }
 
     //窗口置顶
     dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
@@ -378,9 +394,15 @@ unsigned __stdcall threadLockDig(void* arg)
         } 
     }
 
-    dlg.DestroyWindow();
+    
+    ClipCursor(NULL);
+    //恢复鼠标
     ShowCursor(true);
+    //恢复任务栏
     ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);
+    
+    //少了这个没反应 
+    dlg.DestroyWindow();
 
     //_endthread();
     _endthreadex(0);
@@ -399,6 +421,7 @@ int LockMachine()
         _beginthreadex(NULL, 0, threadLockDig, NULL, 0, &threadId);
         TRACE("[服务器]%s(%d):%d\r\n", __FUNCTION__, __LINE__, threadId);
     }
+
 
     CPacket pack(7, NULL, 0);
     CServerSocket::getInstance()->Send(pack);
