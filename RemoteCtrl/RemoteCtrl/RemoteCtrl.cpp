@@ -329,13 +329,13 @@ int SendScreen()
     return 0;
 }
 
-#include "LockDiglog.h"
+#include "LockInfoDialog.h"
 
-CLockDiglog dlg;
+CLockInfoDialog dlg;
 
 unsigned threadId = 0;
 
-unsigned __stdcall threadLockDig(void* arg) 
+unsigned __stdcall threadLockDlg(void* arg)
 {
     TRACE("[服务器]%s(%d):%d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
     //非模态
@@ -418,7 +418,7 @@ int LockMachine()
 {
     if (dlg.m_hWnd == NULL || dlg.m_hWnd == INVALID_HANDLE_VALUE) {
         //_beginthread(threadLockDig, 0, NULL);
-        _beginthreadex(NULL, 0, threadLockDig, NULL, 0, &threadId);
+        _beginthreadex(NULL, 0, threadLockDlg, NULL, 0, &threadId);
         TRACE("[服务器]%s(%d):%d\r\n", __FUNCTION__, __LINE__, threadId);
     }
 

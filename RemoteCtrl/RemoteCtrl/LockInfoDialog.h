@@ -2,15 +2,15 @@
 #include "afxdialogex.h"
 
 
-// CLockDiglog 对话框
+// CLockInfoDialog 对话框
 
-class CLockDiglog : public CDialog
+class CLockInfoDialog : public CDialogEx
 {
-	DECLARE_DYNAMIC(CLockDiglog)
+	DECLARE_DYNAMIC(CLockInfoDialog)
 
 public:
-	CLockDiglog(CWnd* pParent = nullptr);   // 标准构造函数
-	virtual ~CLockDiglog();
+	CLockInfoDialog(CWnd* pParent = nullptr);   // 标准构造函数
+	virtual ~CLockInfoDialog();
 
 // 对话框数据
 #ifdef AFX_DESIGN_TIME

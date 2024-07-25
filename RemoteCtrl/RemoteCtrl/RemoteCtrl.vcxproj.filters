@@ -33,7 +33,7 @@
     <ClInclude Include="ServerSocket.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="LockDiglog.h">
+    <ClInclude Include="LockInfoDialog.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -47,7 +47,7 @@
     <ClCompile Include="ServerSocket.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="LockDiglog.cpp">
+    <ClCompile Include="LockInfoDialog.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
