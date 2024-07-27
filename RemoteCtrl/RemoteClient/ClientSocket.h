@@ -117,7 +117,7 @@ public:
 		memcpy(pData, strData.c_str(), strData.size());	pData += strData.size();
 		*(WORD*)pData = sSum;
 		return strOut.c_str();
-	}
+	} 
 
 public:
 	WORD sHead;

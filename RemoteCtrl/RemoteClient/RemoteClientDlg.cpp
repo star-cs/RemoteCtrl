@@ -125,11 +125,7 @@ void CRemoteClientDlg::threadWatchData()
 			//缓存还是满的，
 			Sleep(1);
 		}
-		
-		
 	}
-	
-
 	pClient->CloseSocket();
 
 }
