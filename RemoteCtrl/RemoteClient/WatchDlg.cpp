@@ -13,7 +13,7 @@
 IMPLEMENT_DYNAMIC(CWatchDlg, CDialogEx)
 
 CWatchDlg::CWatchDlg(CWnd* pParent /*=nullptr*/)
-	: CDialogEx(IDD_DLG_WATCH, pParent)
+	: CDialogEx(133, pParent)
 {
 	tarWidth = -1;
 	tarHeight = -1;
@@ -291,27 +291,6 @@ void CWatchDlg::OnOK()
 
 	//CDialogEx::OnOK();
 }
-
-
-void CWatchDlg::OnBnClickedBtnLock()
-{
-	// TODO: 在此添加控件通知处理程序代码
-	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
-
-	pPersent->SendMessage(WM_SEND_PACKET, 7 << 1 | 1);
-}
-
-
-void CWatchDlg::OnBnClickedBtnUnlock()
-{
-	// TODO: 在此添加控件通知处理程序代码
-	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
-
-	pPersent->SendMessage(WM_SEND_PACKET, 8 << 1 | 1);
-}
-
-
-
 
 
 void CWatchDlg::OnLockBtn()
