@@ -17,31 +17,12 @@ public:
 		return m_instance;
 	}
 
-	bool InitSocket(short port) {
-		if (serv_sock == -1)	return false;
-		sockaddr_in serv_addr;
-		serv_addr.sin_family = AF_INET;
-		serv_addr.sin_port = htons(port);
-		serv_addr.sin_addr.s_addr = INADDR_ANY;
-
-		if (bind(serv_sock, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
-			printf("%d\r\n", GetLastError());
-			return false;
-		}
-
-		if (listen(serv_sock, 1) == -1) {
-			return false;
-		}
-
-		return true;
-	}
-
 	int Run(SOCKET_CALLBACK callback, void* arg, short port = 9527) {
 		// 1 进度的可控性 2 对接的方便性 3 可行性评估，提早暴露风险
 		// TOD0: socket、bind、listen、accept、read、write、close//套接字初始化
-		
+
 		//套接字初始化
-		if (InitSocket(port) == false) { 
+		if (InitSocket(port) == false) {
 			return -1;
 		}
 
@@ -72,6 +53,29 @@ public:
 
 		return 0;
 	}
+
+protected:
+
+	bool InitSocket(short port) {
+		if (serv_sock == -1)	return false;
+		sockaddr_in serv_addr;
+		serv_addr.sin_family = AF_INET;
+		serv_addr.sin_port = htons(port);
+		serv_addr.sin_addr.s_addr = INADDR_ANY;
+
+		if (bind(serv_sock, (sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
+			printf("%d\r\n", GetLastError());
+			return false;
+		}
+
+		if (listen(serv_sock, 1) == -1) {
+			return false;
+		}
+
+		return true;
+	}
+
+	
 
 	bool AcceptClient() {
 		sockaddr_in cli_addr;
@@ -118,10 +122,6 @@ public:
 	bool Send(CPacket& pack) {
 		if (cli_sock == -1) return false;
 		return send(cli_sock, pack.Data(), pack.Size(), 0) > 0;
-	}
-
-	CPacket& GetPacket()  {
-		return m_packet;
 	}
 
 	void CloseClient() {

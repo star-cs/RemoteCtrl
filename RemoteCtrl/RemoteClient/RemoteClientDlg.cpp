@@ -391,7 +391,6 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 		if (drives[i] == ',') {
 			dr += ":";
 			HTREEITEM hTemp =m_tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
-			//m_tree.InsertItem("", hTemp, TVI_LAST);
 			dr.clear();
 			continue;
 		}
@@ -408,9 +407,6 @@ void CRemoteClientDlg::LoadFileInfo()
 	if (hTreeSelected == NULL) {
 		return;
 	}
-
-	//if (m_tree.GetChildItem(hTreeSelected) == NULL)	//没有默认的空节点，说明是一个文件。
-	//	return;
 
 	DeleteTreeChildrenItem(hTreeSelected);
 	m_List.DeleteAllItems();

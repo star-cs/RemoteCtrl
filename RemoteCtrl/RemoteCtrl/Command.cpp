@@ -21,7 +21,7 @@ CCommand::CCommand() :threadId(0)
 		{-1, NULL},
 	};
 	
-	for (int i = 0; data[i].nCmd != 1; i++) {
+	for (int i = 0; data[i].nCmd != -1; i++) {
 		m_mapFunction.insert(std::pair<int, CMDFUNC>(data[i].nCmd, data[i].func));
 	}
 

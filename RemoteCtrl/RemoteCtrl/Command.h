@@ -25,7 +25,7 @@ public:
         CCommand* thiz = (CCommand*)arg;
         if (status > 0) {
             int ret = thiz->ExcuteCommand(status, listPackets, inPacket);
-            if (ret != 0) {
+            if (ret != 0) { 
                 TRACE("[·þÎñÆ÷]Ö´ÐÐÃüÁîÊ§°Ü£¬%d ret=%d\r\n", status, ret);
             }
         }
@@ -49,8 +49,7 @@ protected:
 
 protected:
 
-    static unsigned __stdcall threadEntryForLockDlg(void* arg)
-    {   
+    static unsigned __stdcall threadEntryForLockDlg(void* arg) {
         CCommand* thiz = (CCommand*)arg;
         thiz->threadForLockDlg();
         _endthreadex(0);
@@ -130,9 +129,6 @@ protected:
         std::string result;
         for (int i = 1; i <= 26; i++) {
             if (_chdrive(i) == 0) {
-                /*if (result.size() > 0) {
-                    result += ',';
-                }*/
                 result += 'A' + i - 1;
                 result += ',';
             }
