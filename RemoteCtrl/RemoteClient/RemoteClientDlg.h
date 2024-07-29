@@ -27,7 +27,7 @@ public:
 		return m_isFull;
 	}
 
-	CImage& getImage() {
+	CImage& GetImage() {
 		return m_image;
 	}
 
@@ -38,33 +38,13 @@ public:
 private:
 	CImage m_image; // 截图缓存。
 	bool m_isFull;	// 缓存是否填充
-	bool m_isClose;	// 监控线程是否关闭
+
 private:
-	static void threadEntryForWatchData(void* arg);
-	void threadWatchData();
-
-	static void threadEntryForDownloadFile(void* arg);
-	void threadDownFile();
-
 	void LoadFileInfo();
 
 	CString GetPath(HTREEITEM hTree);
 
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
-
-	// 1 查看磁盘分区
-	// 2 查看指定目录下的文件
-	// 3 打开文件
-	// 4 下载文件（服务端文件传给客户端）
-	// 9 删除文件
-	// 5 鼠标操作
-	// 6 发送屏幕内容
-	// 7 锁机
-	// 8 解锁
-	// 2024 测试连接
-	//返回cmd，失败返回-1。
-	//默认，只接收一次数据就关闭连接。
-	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t nLength = 0);
 
 // 实现
 protected:
@@ -94,4 +74,6 @@ public:
 	afx_msg void OnDelFile();
 	afx_msg LRESULT OnSendMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnBnClickedBtnStartWatch();
+	afx_msg void OnIpnFieldchangedIpaddServer(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnEnChangeEditPort();
 };

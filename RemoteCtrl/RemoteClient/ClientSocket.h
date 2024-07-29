@@ -10,7 +10,6 @@
 
 void Dump(BYTE* pData, size_t nSize);
 
-
 class CPacket
 {
 public: 
@@ -108,8 +107,8 @@ public:
 		return nLength + 6;
 	}
 
-	const char* Data() {
-		strOut.resize(Size());
+	const char* Data(std::string& strOut) const {
+		strOut.resize(nLength + 6);
 		BYTE* pData = (BYTE*)strOut.c_str();
 		*(WORD*)pData = sHead;	pData += 2;
 		*(DWORD*)pData = nLength; pData += 4;
@@ -125,7 +124,6 @@ public:
 	WORD sCmd;
 	std::string strData;
 	WORD sSum;
-	std::string strOut;
 };
 #pragma pack(pop)
 
@@ -168,9 +166,7 @@ public:
 		return m_instance;
 	}
 
-	//无限次调用
-	//bool InitSokcet(const std::string& serverIPAddrness) {
-	bool InitSokcet(int nIP, int nPort) {
+	bool InitSokcet() {
 		if (cli_sock != INVALID_SOCKET) {
 			CloseSocket();
 		}
@@ -178,20 +174,16 @@ public:
 		if (cli_sock == -1) return false;
 		sockaddr_in server_addr;
 		server_addr.sin_family = AF_INET;
-		//server_addr.sin_addr.s_addr = inet_addr(serverIPAddrness.c_str());
-		//server_addr.sin_port = htons(9527);
-		
-		//server_addr.sin_addr.s_addr = nIP;			//字节序问题！
-		server_addr.sin_addr.s_addr = htonl(nIP);	
-		server_addr.sin_port = htons(nPort);
-		
+		server_addr.sin_addr.s_addr = htonl(m_nIP);
+		server_addr.sin_port = htons(m_nPort);
+
 		if (server_addr.sin_addr.s_addr == INADDR_NONE) {
 			AfxMessageBox(_T("指定的Ip地址不存在！"));
 			return false;
 		}
 
 		int ret = connect(cli_sock, (sockaddr*)&server_addr, sizeof(sockaddr));
-		
+
 		if (ret == -1) {
 			AfxMessageBox(_T("conncet连接失败！"));
 			TRACE("[客户端]连接失败：%d %s\r\n", WSAGetLastError(), GetErrInfo(WSAGetLastError()).c_str());
@@ -204,28 +196,22 @@ public:
 
 	int DealCommand() {
 		if (cli_sock == -1) return -1;
-		//客户端会收到服务端多个数据包
-		//char* buffer = new char[BUFFER_SIZE];
 		char* buffer = m_buffer.data();
 
-		//处理完一个文件命令之后，index一定会回到0。如果后续再次点击文件发生错误，那么就是上一次的命令出现了bug
-		//某几个参数写错了的话，bug得找半天。
-		static size_t index = 0;		
+		static size_t index = 0;
 		while (true) {
 			size_t len = recv(cli_sock, buffer + index, BUFFER_SIZE - index, 0);
 			TRACE("[客户端]index = %d len = %d buffer_size = %d\n", index, len, index + len);
 
-			// 1. 之前buffer，index局部置零，会间接性的丢数据。
-			// 2. 特别是，index不为0的情况下，（可能最后几个包一起接收到了，再后几次的recv会为0，index还有数据）。
 			if (len <= 0 && index == 0) {
 				return -1;
 			}
 			index += len;
 			len = index;
-			
+
 			//Dump((BYTE*)buffer, len);
 			m_packet = CPacket((BYTE*)buffer, len);
-			
+
 			if (len > 0) {
 				memmove(buffer, buffer + len, index - len);
 				index -= len;
@@ -240,9 +226,11 @@ public:
 		return send(cli_sock, pData, nSize, 0) > 0;
 	}
 
-	bool Send(CPacket& pack) {
+	bool Send(const CPacket& pack) {
 		if (cli_sock == -1) return false;
-		return send(cli_sock, pack.Data(), pack.Size(), 0) > 0;
+		std::string strOut;
+		pack.Data(strOut);
+		return send(cli_sock, strOut.c_str(), strOut.size(), 0) > 0;
 	}
 
 	bool GetFilePath(std::string& strPath) {
@@ -270,36 +258,42 @@ public:
 		closesocket(cli_sock);
 		cli_sock = INVALID_SOCKET;
 	}
+	
+	void UpdataAddress(int nIP, int nPort) {
+		m_nIP = nIP;
+		m_nPort = nPort;
+	}
 
 private:
 	std::vector<char> m_buffer;
+
+	int m_nIP;
+	int m_nPort;
 
 	//类内声明
 	static CClientSocket* m_instance;
 	SOCKET cli_sock;
 	CPacket m_packet;
 	
-
 	CClientSocket& operator=(const CClientSocket& ss) {}
 
 	//拷贝构造
 	CClientSocket(const CClientSocket& ss) {
 		cli_sock = ss.cli_sock;
+		m_nIP = ss.m_nIP;
+		m_nPort = ss.m_nPort;
 	}
 
-	CClientSocket() {
+	CClientSocket() :m_nIP(INADDR_ANY), m_nPort(0) {
 		if (InitSockEnv() == FALSE) {
 			MessageBox(NULL, _T("无法初始化套接字环境"), _T("初始化错误！"), MB_OK | MB_ICONERROR);	// MB_ICONERROR消息框中会出现一个停止标志图标。
 			exit(0);
 		}
-		//客户端需要在InitSock里面初始化cli_sock
-		//cli_sock = socket(PF_INET, SOCK_STREAM, 0);
 		m_buffer.resize(BUFFER_SIZE);
 		memset(m_buffer.data(), 0, BUFFER_SIZE);
 	}
 
 	~CClientSocket() {
-		//closesocket(cli_sock);
 		WSACleanup();
 	}
 

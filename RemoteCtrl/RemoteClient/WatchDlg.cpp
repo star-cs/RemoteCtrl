@@ -69,20 +69,8 @@ BOOL CWatchDlg::OnInitDialog()
 	CDialogEx::OnInitDialog();
 	
 	//// TODO:  在此添加额外的初始化
-	//MoveWindow(0, 80, 1920, 1080 + 80);
-	//CenterWindow();
-	//m_image.MoveWindow(0, 80, 1920, 1080);
 
 	SetTimer(0, 45, NULL);		//nIDEvent，频率50ms，回调函数
-
-	//CButton* pButton1 = (CButton*)GetDlgItem(IDC_BTN_LOCK);
-	//CButton* pButton2 = (CButton*)GetDlgItem(IDC_BTN_UNLOCK);
-
-	//CRect rect1(0, 0, 80, 30);
-	//CRect rect2(100, 0, 100 + 80, 30);
-
-	//pButton1->MoveWindow(&rect1);
-	//pButton2->MoveWindow(&rect2);
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 	// 异常: OCX 属性页应返回 FALSE
@@ -94,27 +82,25 @@ void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == 0) {
 		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent(); //获取父窗口
 		if (pPersent->isFull()) {
-			//pPersent->getImage().BitBlt(m_image.GetDC()->GetSafeHdc(), 0, 0, SRCCOPY);
 			CRect rect;
 			m_image.GetWindowRect(rect);
 			// 界面缩放
-			pPersent->getImage().StretchBlt(
+			pPersent->GetImage().StretchBlt(
 				m_image.GetDC()->GetSafeHdc(),
 				0, 0, 
 				rect.Width(), rect.Height(), 
 				SRCCOPY);
 
 			if (tarWidth == -1) {
-				tarWidth = pPersent->getImage().GetWidth();
+				tarWidth = pPersent->GetImage().GetWidth();
 			}
 
 			if (tarHeight == -1) {
-				tarHeight = pPersent->getImage().GetHeight();
+				tarHeight = pPersent->GetImage().GetHeight();
 			}
 
-			
 			m_image.InvalidateRect(NULL);		//通知画面重绘
-			pPersent->getImage().Destroy(); 
+			pPersent->GetImage().Destroy(); 
 			pPersent->setImageStatus();			//isFull重置为false
 		}
 	}
