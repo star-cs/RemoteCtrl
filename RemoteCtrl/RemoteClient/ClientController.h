@@ -41,13 +41,6 @@ public:
 		CClientSocket::getInstance()->CloseSocket();
 	}
 
-	bool SendPacket(const CPacket& pack) {
-		CClientSocket* pClient = CClientSocket::getInstance();
-		if (pClient->InitSocket() == false)
-			return false;
-	
-		return pClient->Send(pack);
-	}
 
 	// 1 查看磁盘分区
 	// 2 查看指定目录下的文件
@@ -59,27 +52,31 @@ public:
 	// 7 锁机
 	// 8 解锁
 	// 2024 测试连接
-	//返回cmd，失败返回-1。
-	//默认，只接收一次数据就关闭连接。
+	// 返回cmd，失败返回-1。
+	// 默认，只接收一次数据就关闭连接。
 	int SendCommandPacket(
 		int nCmd,
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
-		size_t nLength = 0) {
+		size_t nLength = 0,
+		std::list<CPacket>* recvPackets = NULL) {
 
 		CClientSocket* pClient = CClientSocket::getInstance();
-		if (pClient->InitSocket() == false)
-			return false;
 
-		HANDLE hEvnet = CreateEvent(0, TRUE, FALSE, NULL);
+		HANDLE hEvnet = CreateEvent(NULL, TRUE, FALSE, NULL);
+		
+		std::list<CPacket> lstPackets;
+		if (recvPackets == NULL) {
+			recvPackets = &lstPackets;
+		}
 
-		//TODO 应该将包插入到队列中
-		pClient->Send(CPacket(nCmd, pData, nLength, hEvnet));
-		int cmd = pClient->DealCommand();
-		TRACE("ack = %d\r\n", cmd);
-		if (bAutoClose)
-			CloseSocket();
-		return cmd;
+		pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvnet), *recvPackets);
+		
+		if (recvPackets->size() > 0) {
+			return recvPackets->front().sCmd;
+		}
+
+		return -1;
 	}
 
 	int GetImage(CImage& image) {
@@ -115,8 +112,6 @@ protected:
 		}
 	}
 
-	LRESULT OnSendPack(UINT nMsg, WPARAM wParam, LPARAM lParam);
-	LRESULT OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowStatus(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowWatcher(UINT nMsg, WPARAM wParam, LPARAM lParam);
 

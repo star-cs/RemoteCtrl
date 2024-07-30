@@ -10,8 +10,6 @@
 #pragma pack(push)
 #pragma pack(1)
 
-void Dump(BYTE* pData, size_t nSize);
-
 class CPacket
 {
 public: 
@@ -228,18 +226,8 @@ public:
 		}
 		return -1;
 	}
-
-	bool Send(const char* pData, int nSize) {
-		if (cli_sock == -1) return false;
-		return send(cli_sock, pData, nSize, 0) > 0;
-	}
-
-	bool Send(const CPacket& pack) {
-		if (cli_sock == -1) return false;
-		std::string strOut;
-		pack.Data(strOut);
-		return send(cli_sock, strOut.c_str(), strOut.size(), 0) > 0;
-	}
+	
+	bool SendPacket(CPacket pack, std::list<CPacket>& recvPackets);
 
 	bool GetFilePath(std::string& strPath) {
 		if ((m_packet.sCmd == 2) || (m_packet.sCmd == 3) || (m_packet.sCmd == 4))
@@ -268,11 +256,12 @@ public:
 	}
 	
 	void UpdataAddress(int nIP, int nPort) {
-		m_nIP = nIP;
-		m_nPort = nPort;
+		if ((m_nIP != nIP) || (m_nPort != nPort))
+		{
+			m_nIP = nIP;
+			m_nPort = nPort;
+		}
 	}
-
-
 
 private:
 	std::list<CPacket> m_listSendPacket;	//要发送的数据包
@@ -292,6 +281,19 @@ private:
 	static void threadEntry(void* arg);
 	void threadFunc();
 
+
+	bool Send(const char* pData, int nSize) {
+		if (cli_sock == -1) return false;
+		return send(cli_sock, pData, nSize, 0) > 0;
+	}
+
+	bool Send(const CPacket& pack) {
+		if (cli_sock == -1) return false;
+		std::string strOut;
+		pack.Data(strOut);
+		return send(cli_sock, strOut.c_str(), strOut.size(), 0) > 0;
+	}
+
 	CClientSocket& operator=(const CClientSocket& ss) {}
 
 	//拷贝构造
@@ -301,13 +303,14 @@ private:
 		m_nPort = ss.m_nPort;
 	}
 
-	CClientSocket() :m_nIP(INADDR_ANY), m_nPort(0) {
+	CClientSocket() :m_nIP(INADDR_ANY), m_nPort(0), cli_sock(INVALID_SOCKET) {
 		if (InitSockEnv() == FALSE) {
 			MessageBox(NULL, _T("无法初始化套接字环境"), _T("初始化错误！"), MB_OK | MB_ICONERROR);	// MB_ICONERROR消息框中会出现一个停止标志图标。
 			exit(0);
 		}
 		m_buffer.resize(BUFFER_SIZE);
 		memset(m_buffer.data(), 0, BUFFER_SIZE);
+
 	}
 
 	~CClientSocket() {

@@ -54,8 +54,6 @@ CClientController::CClientController() :
 		UINT nMsg;
 		MSGFUNC func;
 	}data[] = {
-		{WM_SEND_PACK, &CClientController::OnSendPack},
-		{WM_SEND_PACK, &CClientController::OnSendData},
 		{WM_SEND_PACK, &CClientController::OnShowStatus},
 		{WM_SEND_PACK, &CClientController::OnShowWatcher},
 		{(UINT)-1, NULL},
@@ -112,9 +110,10 @@ void CClientController::threadWatchScreen()
 	Sleep(50);
 	while (!m_isClose) {
 		if (m_watchDlg.isFull() == false) {
-			int ret = SendCommandPacket(6);
+			std::list<CPacket> recvPackets;
+			int ret = SendCommandPacket(6, true, NULL , 0, &recvPackets);
 			if (ret == 6) {
-				if (GetImage(m_watchDlg.GetImage()) == 0) {
+				if (CTool::Byte2Image(m_watchDlg.GetImage(), recvPackets.front().strData) == 0) {
 					m_watchDlg.setImageStatus(true);
 				}
 				else {
@@ -237,20 +236,6 @@ void CClientController::threadFunc()
 		}
 
 	}
-}
-
-LRESULT CClientController::OnSendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
-{
-	CClientSocket* pClient = CClientSocket::getInstance();
-	CPacket* pPacket = (CPacket*)wParam;
-	return pClient->Send(*pPacket);
-}
-
-LRESULT CClientController::OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam)
-{
-	CClientSocket* pClient = CClientSocket::getInstance();
-	char* pData = (char*)wParam;
-	return pClient->Send(pData, (int)lParam);
 }
 
 LRESULT CClientController::OnShowStatus(UINT nMsg, WPARAM wParam, LPARAM lParam)

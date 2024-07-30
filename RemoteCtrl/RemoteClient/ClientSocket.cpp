@@ -26,16 +26,27 @@ std::string GetErrInfo(int wsaErrCode)
 }
 
 
-void Dump(BYTE* pData, size_t nSize) {
-	std::string strOut;
-	for (size_t i = 0; i < nSize; i++) {
-		char buf[8] = "";
-		if (i % 15 == 0) strOut += "\n";
-		snprintf(buf, sizeof(buf), "%02X ", pData[i] & 0xFF);
-		strOut += buf;
+bool CClientSocket::SendPacket(CPacket pack, std::list<CPacket>& recvPackets)
+{
+	if (cli_sock == INVALID_SOCKET) {
+		// 正式发送包的时候，IP和Port会固定下来了。
+		if (InitSocket() == false) return false;
+		//启动线程
+		_beginthread(&CClientSocket::threadEntry, 0, this);
 	}
-	strOut += "\n";
-	OutputDebugStringA(strOut.c_str());
+
+	m_listSendPacket.push_back(pack);
+	WaitForSingleObject(pack.hEvent, INFINITE);
+
+	auto it = m_mapRecvPacket.find(pack.hEvent);
+	if (it != m_mapRecvPacket.end()) {
+		for (auto i = it->second.begin(); i != it->second.end(); i++) {
+			recvPackets.push_back(*i);
+		}
+		m_mapRecvPacket.erase(it);
+		return true;
+	}
+	return false;
 }
 
 void CClientSocket::threadEntry(void* arg)
@@ -47,9 +58,6 @@ void CClientSocket::threadEntry(void* arg)
 
 void CClientSocket::threadFunc()
 {
-	if (InitSocket() == false) {
-		return;
-	}
 	std::string strBuffer;
 	strBuffer.resize(BUFFER_SIZE);
 	char* pBuffer = (char*)strBuffer.c_str();
@@ -59,6 +67,7 @@ void CClientSocket::threadFunc()
 	{
 		if (m_listSendPacket.size() > 0) 
 		{
+			TRACE("[客户端] m_listSendPacket.size() = %d \r\n", m_listSendPacket.size());
 			CPacket& head = m_listSendPacket.front();
 			if (Send(head) == false)
 			{
@@ -74,6 +83,8 @@ void CClientSocket::threadFunc()
 				size_t size = (size_t)index;
 				CPacket pack((BYTE*)pBuffer, size);
 				if (size > 0) {
+					index -= size;
+
 					pack.hEvent = head.hEvent;
 					it.first->second.push_back(pack);
 					SetEvent(head.hEvent);
@@ -87,4 +98,5 @@ void CClientSocket::threadFunc()
 			m_listSendPacket.pop_front();
 		}
 	}
+	CloseSocket();
 }
