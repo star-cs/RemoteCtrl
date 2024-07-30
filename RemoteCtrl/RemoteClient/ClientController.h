@@ -43,7 +43,7 @@ public:
 
 	bool SendPacket(const CPacket& pack) {
 		CClientSocket* pClient = CClientSocket::getInstance();
-		if (pClient->InitSokcet() == false)
+		if (pClient->InitSocket() == false)
 			return false;
 	
 		return pClient->Send(pack);
@@ -68,9 +68,13 @@ public:
 		size_t nLength = 0) {
 
 		CClientSocket* pClient = CClientSocket::getInstance();
-		if (pClient->InitSokcet() == false)
+		if (pClient->InitSocket() == false)
 			return false;
-		pClient->Send(CPacket(nCmd, pData, nLength));
+
+		HANDLE hEvnet = CreateEvent(0, TRUE, FALSE, NULL);
+
+		//TODO 应该将包插入到队列中
+		pClient->Send(CPacket(nCmd, pData, nLength, hEvnet));
 		int cmd = pClient->DealCommand();
 		TRACE("ack = %d\r\n", cmd);
 		if (bAutoClose)

@@ -4,6 +4,8 @@
 #include <vector>
 #include "pch.h"
 #include "framework.h"
+#include <list>
+#include <map>
 
 #pragma pack(push)
 #pragma pack(1)
@@ -15,7 +17,7 @@ class CPacket
 public: 
 	CPacket() : sHead(0), nLength(0), sCmd(0), sSum(0) {}
 
-	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize, HANDLE hEvent) {
 		sHead = 0xFEFF;
 		nLength = nSize + 4;
 		sCmd = nCmd;
@@ -31,6 +33,8 @@ public:
 		for (int j = 0; j < nSize; j++) {
 			sSum += BYTE(pData[j]) & 0xFF;
 		}
+
+		this->hEvent = hEvent;
 	}
 
 	CPacket(const CPacket& pack) {
@@ -39,6 +43,7 @@ public:
 		sCmd = pack.sCmd;
 		strData = pack.strData;
 		sSum = pack.sSum;
+		hEvent = pack.hEvent;
 	}
 
 	//nSize传入是数据大小，传出是获取的数据量
@@ -99,6 +104,7 @@ public:
 			sCmd = pack.sCmd;
 			strData = pack.strData;
 			sSum = pack.sSum;
+			hEvent = pack.hEvent;
 		}
 		return *this;
 	}
@@ -124,6 +130,8 @@ public:
 	WORD sCmd;
 	std::string strData;
 	WORD sSum;
+
+	HANDLE hEvent;		//发送命令数据包，添加hEvent，便于事件通知获取到对应的接收包。
 };
 #pragma pack(pop)
 
@@ -166,7 +174,7 @@ public:
 		return m_instance;
 	}
 
-	bool InitSokcet() {
+	bool InitSocket() {
 		if (cli_sock != INVALID_SOCKET) {
 			CloseSocket();
 		}
@@ -264,7 +272,12 @@ public:
 		m_nPort = nPort;
 	}
 
+
+
 private:
+	std::list<CPacket> m_listSendPacket;	//要发送的数据包
+	std::map<HANDLE, std::list<CPacket>> m_mapRecvPacket;	// 事件句柄，以及接收到的数据包。
+
 	std::vector<char> m_buffer;
 
 	int m_nIP;
@@ -275,6 +288,10 @@ private:
 	SOCKET cli_sock;
 	CPacket m_packet;
 	
+private:
+	static void threadEntry(void* arg);
+	void threadFunc();
+
 	CClientSocket& operator=(const CClientSocket& ss) {}
 
 	//拷贝构造
