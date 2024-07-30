@@ -5,8 +5,6 @@
 #pragma once
 #include "StatusDlg.h"
 
-#define WM_SEND_PACKET (WM_USER+1)
-
 // CRemoteClientDlg 对话框
 class CRemoteClientDlg : public CDialogEx
 {
@@ -22,22 +20,6 @@ public:
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 	
-public:
-	bool isFull() const {
-		return m_isFull;
-	}
-
-	CImage& GetImage() {
-		return m_image;
-	}
-
-	void setImageStatus(bool isFull = false) {
-		m_isFull = isFull;
-	}
-
-private:
-	CImage m_image; // 截图缓存。
-	bool m_isFull;	// 缓存是否填充
 
 private:
 	void LoadFileInfo();
@@ -72,7 +54,6 @@ public:
 	afx_msg void OnDownloadFile();
 	afx_msg void OnRunFile();
 	afx_msg void OnDelFile();
-	afx_msg LRESULT OnSendMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnBnClickedBtnStartWatch();
 	afx_msg void OnIpnFieldchangedIpaddServer(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnEnChangeEditPort();

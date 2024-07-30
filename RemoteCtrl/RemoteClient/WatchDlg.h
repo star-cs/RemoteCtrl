@@ -22,14 +22,27 @@ protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
 	DECLARE_MESSAGE_MAP()
+
 public:
+	bool isFull() const {
+		return m_isFull;
+	}
+
+	void setImageStatus(bool isFull = false) {
+		m_isFull = isFull;
+	}
+
+	CImage& GetImage() {
+		return m_image;
+	}
+
 	CPoint UserPoint2ScreenPoint(CPoint& point, bool isScreen = false);
 
 	int tarHeight, tarWidth;
 
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	virtual BOOL OnInitDialog();
-	CStatic m_image;
+	CStatic m_picture;
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
@@ -41,4 +54,8 @@ public:
 	virtual void OnOK();
 	afx_msg void OnLockBtn();
 	afx_msg void OnUnlockBtn();
+	
+private:
+	bool m_isFull;	// 缓存是否填充
+	CImage m_image; // 截图缓存。
 };

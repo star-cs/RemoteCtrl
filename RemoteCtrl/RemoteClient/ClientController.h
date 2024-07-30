@@ -80,42 +80,12 @@ public:
 
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();
-		return CTool::Byte2Image(image, pClient->GetPacket().strData);
+		return CTool::Byte2Image(image, pClient->GetPacket().strData); 
 	}
 
-	int DownFile(CString strPath) {
-		CFileDialog dlg(FALSE, "*",
-			strPath, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-			NULL, &m_remoteDlg);
-
-		if (dlg.DoModal() == IDOK) {
-			m_strRemote = strPath;
-			m_strLocal = dlg.GetPathName();
-
-			m_hThreadDown = (HANDLE)_beginthread(&CClientController::threadEntryForDownloadFile, 0, this);
-			// 刚创建，没被wait。此时线程开始执行。
-			if (WaitForSingleObject(m_hThreadDown, 0) != WAIT_TIMEOUT) {
-				return -1;
-			}
-			m_remoteDlg.BeginWaitCursor();		// 设置光标为等待状态。
-			m_statusDlg.m_info.SetWindowText(_T("命令执行中..."));
-			m_statusDlg.ShowWindow(SW_SHOW);
-			m_statusDlg.CenterWindow(&m_remoteDlg);
-			m_statusDlg.SetActiveWindow();
-		}
-		return 0;
-	}
+	int DownFile(CString strPath);
 	
-	void StartWatchScreen() {
-		m_isClose = false;
-		CWatchDlg dlg(&m_remoteDlg);
-
-		m_hThreadWatch = (HANDLE)_beginthread(&CClientController::threadEntryForWatchScreen, 0, this);
-		dlg.DoModal();
-
-		m_isClose = true;
-		WaitForSingleObject(m_hThreadWatch, 500);
-	}
+	void StartWatchScreen();
 
 protected:
 	CClientController();
@@ -188,5 +158,14 @@ private:
 
 	static CClientController* m_instance;
 
+	class CHelper {
+	public:
+		CHelper(){}
+
+		~CHelper() {
+			CClientController::releaseInstance();
+		}
+	};
+	static CHelper m_helper;
 };
 

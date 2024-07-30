@@ -6,7 +6,7 @@
 #include "afxdialogex.h"
 #include "WatchDlg.h"
 
-#include "RemoteClientDlg.h"
+#include "ClientController.h"
 
 // CWatchDlg 对话框
 
@@ -26,7 +26,7 @@ CWatchDlg::~CWatchDlg()
 void CWatchDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	DDX_Control(pDX, IDC_WATCH, m_image);
+	DDX_Control(pDX, IDC_WATCH, m_picture);
 }
 
 CPoint CWatchDlg::UserPoint2ScreenPoint(CPoint& point, bool isScreen)
@@ -35,7 +35,7 @@ CPoint CWatchDlg::UserPoint2ScreenPoint(CPoint& point, bool isScreen)
 		ScreenToClient(&point);	//已知的已经是相对坐标
 
 	CRect clientRect;
-	m_image.GetWindowRect(clientRect);
+	m_picture.GetWindowRect(clientRect);
 
 	int width = clientRect.Width();
 	int Height = clientRect.Height();
@@ -70,6 +70,7 @@ BOOL CWatchDlg::OnInitDialog()
 	
 	//// TODO:  在此添加额外的初始化
 
+	m_isFull = false;
 	SetTimer(0, 45, NULL);		//nIDEvent，频率50ms，回调函数
 
 	return TRUE;  // return TRUE unless you set the focus to a control
@@ -80,28 +81,28 @@ BOOL CWatchDlg::OnInitDialog()
 void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 {
 	if (nIDEvent == 0) {
-		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent(); //获取父窗口
-		if (pPersent->isFull()) {
+		CClientController* pController = CClientController::getInstance();
+		if (m_isFull) {
 			CRect rect;
-			m_image.GetWindowRect(rect);
-			// 界面缩放
-			pPersent->GetImage().StretchBlt(
-				m_image.GetDC()->GetSafeHdc(),
-				0, 0, 
-				rect.Width(), rect.Height(), 
-				SRCCOPY);
+			m_picture.GetWindowRect(rect);
 
 			if (tarWidth == -1) {
-				tarWidth = pPersent->GetImage().GetWidth();
+				tarWidth = m_image.GetWidth();
 			}
 
 			if (tarHeight == -1) {
-				tarHeight = pPersent->GetImage().GetHeight();
+				tarHeight = m_image.GetHeight();
 			}
 
-			m_image.InvalidateRect(NULL);		//通知画面重绘
-			pPersent->GetImage().Destroy(); 
-			pPersent->setImageStatus();			//isFull重置为false
+			// 界面缩放
+			m_image.StretchBlt(
+				m_picture.GetDC()->GetSafeHdc(),
+				0, 0,
+				rect.Width(), rect.Height(),
+				SRCCOPY);
+
+			m_picture.InvalidateRect(NULL);		//通知画面重绘
+			m_isFull = false;
 		}
 	}
 
@@ -119,9 +120,7 @@ void CWatchDlg::OnLButtonDown(UINT nFlags, CPoint point)
 		m_mouse.nButton = 0;
 		m_mouse.ptXY = cur;
 
-		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
-
-		int ret = pPersent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM)&m_mouse);
+		CClientController::getInstance()->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(m_mouse));
 
 		CDialogEx::OnLButtonDown(nFlags, point);
 	}
@@ -138,9 +137,7 @@ void CWatchDlg::OnLButtonUp(UINT nFlags, CPoint point)
 		m_mouse.nButton = 0;
 		m_mouse.ptXY = cur;
 
-		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
-
-		int ret = pPersent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM)&m_mouse);
+		CClientController::getInstance()->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(m_mouse));
 
 		CDialogEx::OnLButtonUp(nFlags, point);
 	}
@@ -158,9 +155,7 @@ void CWatchDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 		m_mouse.nButton = 0;
 		m_mouse.ptXY = cur;
 
-		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
-
-		int ret = pPersent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM)&m_mouse);
+		CClientController::getInstance()->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(m_mouse));
 
 		CDialogEx::OnLButtonDblClk(nFlags, point);
 	}
@@ -179,9 +174,8 @@ void CWatchDlg::OnStnClickedWatch()
 		m_mouse.nButton = 0;
 		m_mouse.ptXY = cur;
 
-		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+		CClientController::getInstance()->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(m_mouse));
 
-		int ret = pPersent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM)&m_mouse);
 	}
 
 }
@@ -198,9 +192,8 @@ void CWatchDlg::OnRButtonDown(UINT nFlags, CPoint point)
 		m_mouse.nButton = 1;
 		m_mouse.ptXY = cur;
 
-		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+		CClientController::getInstance()->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(m_mouse));
 
-		int ret = pPersent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM)&m_mouse);
 
 		CDialogEx::OnRButtonDown(nFlags, point);
 	}
@@ -218,9 +211,7 @@ void CWatchDlg::OnRButtonUp(UINT nFlags, CPoint point)
 		m_mouse.nButton = 1;
 		m_mouse.ptXY = cur;
 
-		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
-
-		int ret = pPersent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM)&m_mouse);
+		CClientController::getInstance()->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(m_mouse));
 
 		CDialogEx::OnRButtonUp(nFlags, point);
 	}
@@ -238,10 +229,8 @@ void CWatchDlg::OnRButtonDblClk(UINT nFlags, CPoint point)
 		m_mouse.nButton = 1;
 		m_mouse.ptXY = cur;
 
-		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
-
-		int ret = pPersent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM)&m_mouse);
-
+		CClientController::getInstance()->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(m_mouse));
+		
 		CDialogEx::OnRButtonDblClk(nFlags, point);
 	}
 }
@@ -260,9 +249,7 @@ void CWatchDlg::OnMouseMove(UINT nFlags, CPoint point)
 		m_mouse.nButton = 3;
 		m_mouse.ptXY = cur;
 
-		CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
-
-		int ret = pPersent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM)&m_mouse);
+		CClientController::getInstance()->SendCommandPacket(5, true, (BYTE*)&m_mouse, sizeof(m_mouse));
 
 		CDialogEx::OnMouseMove(nFlags, point);
 	}
@@ -279,15 +266,13 @@ void CWatchDlg::OnOK()
 
 void CWatchDlg::OnLockBtn()
 {
-	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+	CClientController::getInstance()->SendCommandPacket(7);
 
-	pPersent->SendMessage(WM_SEND_PACKET, 7 << 1 | 1);
 }
 
 
 void CWatchDlg::OnUnlockBtn()
 {
-	CRemoteClientDlg* pPersent = (CRemoteClientDlg*)GetParent();
+	CClientController::getInstance()->SendCommandPacket(8);
 
-	pPersent->SendMessage(WM_SEND_PACKET, 8 << 1 | 1);
 }

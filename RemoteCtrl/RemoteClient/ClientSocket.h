@@ -192,7 +192,7 @@ public:
 		return true;
 	}
 
-#define BUFFER_SIZE 40960000
+#define BUFFER_SIZE 20480000
 
 	int DealCommand() {
 		if (cli_sock == -1) return -1;
@@ -203,7 +203,7 @@ public:
 			size_t len = recv(cli_sock, buffer + index, BUFFER_SIZE - index, 0);
 			TRACE("[¿Í»§¶Ë]index = %d len = %d buffer_size = %d\n", index, len, index + len);
 
-			if (len <= 0 && index == 0) {
+			if ((int)len <= 0 && (int)index == 0) {
 				return -1;
 			}
 			index += len;

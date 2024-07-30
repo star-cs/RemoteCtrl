@@ -87,7 +87,6 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
 	ON_COMMAND(ID_DEL_FILE, &CRemoteClientDlg::OnDelFile)
-	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendMessage)
 	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
 	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADD_SERVER, &CRemoteClientDlg::OnIpnFieldchangedIpaddServer)
 	ON_EN_CHANGE(IDC_EDIT_PORT, &CRemoteClientDlg::OnEnChangeEditPort)
@@ -201,13 +200,14 @@ void CRemoteClientDlg::OnBnClickedButTest()
 //获取磁盘信息
 void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 {
-	int ret = CClientController::getInstance()->SendCommandPacket(1);
+	CClientController* pController = CClientController::getInstance();
+
+	int ret = pController->SendCommandPacket(1);
 	if (ret == -1) {
 		AfxMessageBox(_T("命令处理失败"));
 	}
 
-	CClientSocket* pClient = CClientSocket::getInstance();
-	std::string drives = pClient->GetPacket().strData;
+	std::string drives = CClientSocket::getInstance()->GetPacket().strData;
 
 	std::string dr;
 	m_tree.DeleteAllItems();
@@ -395,34 +395,6 @@ void CRemoteClientDlg::OnDelFile()
 		}
 		m_List.DeleteItem(nListSelected);	//列表中删除对应item
 	}
-}
-
-//消息响应
-LRESULT CRemoteClientDlg::OnSendMessage(WPARAM wParam, LPARAM lParam)
-{
-	int ret = 0;
-	int cmd = wParam >> 1;
-
-	switch (cmd) {
-	case 4:
-	{
-		CString strFile = (LPCSTR)lParam;
-		ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
-	}
-		break;
-	case 5:
-		ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSEEV));
-		break;
-	case 6:
-	case 7:
-	case 8:
-		ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1);
-		break;
-	default:
-		ret = -1;
-	}
-
-	return ret;
 }
 
 

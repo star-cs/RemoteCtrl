@@ -5,6 +5,43 @@ std::map<UINT, CClientController::MSGFUNC> CClientController::m_mapFunc;
 
 CClientController* CClientController::m_instance = NULL;
 
+CClientController::CHelper CClientController::m_helper;
+
+int CClientController::DownFile(CString strPath)
+{
+	CFileDialog dlg(FALSE, "*",
+		strPath, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+		NULL, &m_remoteDlg);
+
+	if (dlg.DoModal() == IDOK) {
+		m_strRemote = strPath;
+		m_strLocal = dlg.GetPathName();
+
+		m_hThreadDown = (HANDLE)_beginthread(&CClientController::threadEntryForDownloadFile, 0, this);
+		// 刚创建，没被wait。此时线程开始执行。
+		if (WaitForSingleObject(m_hThreadDown, 0) != WAIT_TIMEOUT) {
+			return -1;
+		}
+		m_remoteDlg.BeginWaitCursor();		// 设置光标为等待状态。
+		m_statusDlg.m_info.SetWindowText(_T("命令执行中..."));
+		m_statusDlg.ShowWindow(SW_SHOW);
+		m_statusDlg.CenterWindow(&m_remoteDlg);
+		m_statusDlg.SetActiveWindow();
+	}
+	return 0;
+}
+
+void CClientController::StartWatchScreen()
+{
+	m_isClose = false;
+
+	m_hThreadWatch = (HANDLE)_beginthread(&CClientController::threadEntryForWatchScreen, 0, this);
+	m_watchDlg.DoModal();
+
+	m_isClose = true;
+	WaitForSingleObject(m_hThreadWatch, 500);
+}
+
 CClientController::CClientController() :
 	//初始化指定父窗口
 	m_statusDlg(&m_remoteDlg),
@@ -74,11 +111,11 @@ void CClientController::threadWatchScreen()
 {
 	Sleep(50);
 	while (!m_isClose) {
-		if (m_remoteDlg.isFull() == false) {
+		if (m_watchDlg.isFull() == false) {
 			int ret = SendCommandPacket(6);
 			if (ret == 6) {
-				if (GetImage(m_remoteDlg.GetImage()) == 0) {
-					m_remoteDlg.setImageStatus(true);
+				if (GetImage(m_watchDlg.GetImage()) == 0) {
+					m_watchDlg.setImageStatus(true);
 				}
 				else {
 					TRACE("获取图片失败！\r\n");
