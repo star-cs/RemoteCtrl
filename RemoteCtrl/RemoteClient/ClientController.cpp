@@ -7,6 +7,27 @@ CClientController* CClientController::m_instance = NULL;
 
 CClientController::CHelper CClientController::m_helper;
 
+int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, std::list<CPacket>* recvPackets)
+{
+	CClientSocket* pClient = CClientSocket::getInstance();
+
+	HANDLE hEvnet = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	std::list<CPacket> lstPackets;
+	if (recvPackets == NULL) {
+		recvPackets = &lstPackets;
+	}
+
+	pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvnet), *recvPackets, bAutoClose);
+
+	CloseHandle(hEvnet);
+	if (recvPackets->size() > 0) {
+		return recvPackets->front().sCmd;
+	}
+
+	return -1;
+}
+
 int CClientController::DownFile(CString strPath)
 {
 	CFileDialog dlg(FALSE, "*",
@@ -91,7 +112,8 @@ LRESULT CClientController::SendMessage(MSG msg)
 	MSGINFO info(msg);
 	PostThreadMessage(m_nThreadID, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)&hEvent);
 	//通过事件通知，并通过结构体存储结果。
-	WaitForSingleObject(hEvent, -1);
+	WaitForSingleObject(hEvent, INFINITE);
+	CloseHandle(hEvent);
 
 	return info.result;
 }
@@ -146,22 +168,27 @@ void CClientController::threadForDownloadFile()
 		return;
 	}
 	TRACE("[客户端]%s\r\n", LPCSTR(m_strRemote));
-	CClientSocket* pClient = CClientSocket::getInstance();
+
+
+	CClientController* pController = CClientController::getInstance();
+	std::list<CPacket> recvCPackets;
+
 	do {
-		// CString --> LPCSTR --> BYTE*
-		int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength());
+		int ret = pController->SendCommandPacket(4, false, (BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength(), &recvCPackets);
 		if (ret < 0) {
 			AfxMessageBox("执行下载命令失败！");
 			TRACE("执行下载命令失败，ret = %d\r\n", ret);
 			break;
 		}
-
-		long long nLength = *(long long*)pClient->GetPacket().strData.c_str(); //待下载的文件长度
+		long long nLength = *(long long*)recvCPackets.front().strData.c_str(); //待下载的文件长度
 		if (nLength == 0) {
 			AfxMessageBox("文件长度为零，或者无法读取文件！！！");
 			break;
 		}
 
+		recvCPackets.pop_front();
+
+		// CString --> LPCSTR --> BYTE*
 		m_statusDlg.download_process.SetRange(0, 100);
 		long long nCount = 0;
 		while (nCount < nLength)
@@ -173,27 +200,22 @@ void CClientController::threadForDownloadFile()
 			temp.Format(_T("命令执行中 进度 = %f %%"), cur_portion);
 			m_statusDlg.m_info.SetWindowText(temp);
 
-			ret = pClient->DealCommand();
+			CPacket cur = recvCPackets.front();
 
-			if (ret < 0) {
-				AfxMessageBox("传输失败！！！");
-				TRACE("传输失败！！！，ret = %d\r\n", ret);
-				break;
-			}
+			size_t cur_size = cur.strData.size();
 
-			size_t cur_size = pClient->GetPacket().strData.size();
-
-			fwrite(pClient->GetPacket().strData.c_str(), 1, cur_size, pFile);
+			fwrite(cur.strData.c_str(), 1, cur_size, pFile);
 
 			nCount += cur_size;
 
+			recvCPackets.pop_front();
 		}
+
+		if(nCount == nLength) m_remoteDlg.MessageBox(_T("下载完成！"), _T("完成"));
 	} while (0);
 	fclose(pFile);
-	pClient->CloseSocket();
 	m_statusDlg.ShowWindow(SW_HIDE);
 	m_remoteDlg.EndWaitCursor();
-	m_remoteDlg.MessageBox(_T("下载完成！"), _T("完成"));
 }
 
 

@@ -60,7 +60,7 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	, m_nPort(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-}
+} 
 
 
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
@@ -197,17 +197,18 @@ void CRemoteClientDlg::OnBnClickedButTest()
 }
 
 
-//获取磁盘信息
+// 获取磁盘信息
 void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 {
 	CClientController* pController = CClientController::getInstance();
 
-	int ret = pController->SendCommandPacket(1);
+	std::list<CPacket> recvCPakcets;
+	int ret = pController->SendCommandPacket(1, true, NULL, 0, &recvCPakcets);
 	if (ret == -1) {
 		AfxMessageBox(_T("命令处理失败"));
 	}
 
-	std::string drives = CClientSocket::getInstance()->GetPacket().strData;
+	std::string drives = recvCPakcets.front().strData;
 
 	std::string dr;
 	m_tree.DeleteAllItems();
@@ -226,7 +227,7 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 }
 
 void CRemoteClientDlg::LoadFileInfo()
-{
+ {
 	CPoint ptMouse;
 	GetCursorPos(&ptMouse);
 	m_tree.ScreenToClient(&ptMouse);
@@ -240,43 +241,32 @@ void CRemoteClientDlg::LoadFileInfo()
 
 	CString strPath = GetPath(hTreeSelected);
 
-	int nCmd = CClientController::getInstance()->SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
-
-	PFILEINFO pFileInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
-	CClientSocket* pClient = CClientSocket::getInstance();
+	std::list<CPacket> recvCPackets;
+	int nCmd = CClientController::getInstance()->SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength() , &recvCPackets);
+	
 	int count = 0;
-	while (pFileInfo->HasNext) 
-	{
-		TRACE("[客户端] FileName = [%s] HasNext=%d IsDirectory=%d IsInvalid=%d \r\n", pFileInfo->szFileName, pFileInfo->HasNext, pFileInfo->IsDirectory, pFileInfo->IsInvalid);
-		if (pFileInfo->IsDirectory) {
-			//目录添加到左侧的树状里。
-			if (CString(pFileInfo->szFileName) == "." || (CString(pFileInfo->szFileName) == ".."))
-			{
-				int cmd = pClient->DealCommand();
-				TRACE("ack:%d\n", pClient->GetPacket().sCmd);
-				if (cmd < 0) {
-					break;
+	if (recvCPackets.size() > 0) {
+		std::list<CPacket>::iterator it = recvCPackets.begin();
+		for (; it != recvCPackets.end(); it++) {
+			PFILEINFO pFileInfo = (PFILEINFO)(*it).strData.c_str();
+			count++;
+			if (pFileInfo->HasNext == FALSE) continue;
+			if (pFileInfo->IsDirectory) {
+				//目录添加到左侧的树状里。
+				if (CString(pFileInfo->szFileName) == "." || (CString(pFileInfo->szFileName) == ".."))
+				{
+					continue;
 				}
-				pFileInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
-				continue;
+
+				HTREEITEM hTemp = m_tree.InsertItem(pFileInfo->szFileName, hTreeSelected, TVI_LAST);
+				m_tree.InsertItem("", hTemp, TVI_LAST);
 			}
-			
-			HTREEITEM hTemp = m_tree.InsertItem(pFileInfo->szFileName, hTreeSelected, TVI_LAST);
-			m_tree.InsertItem("", hTemp, TVI_LAST);
+			else {
+				//文件添加到右侧的列表中。
+				m_List.InsertItem(0, pFileInfo->szFileName);
+			}
 		}
-		else {
-			//文件添加到右侧的列表中。
-			m_List.InsertItem(0, pFileInfo->szFileName);
-		}
-		count++;
-		int cmd = pClient->DealCommand();
-		//TRACE("ack:%d\r\n", pClient->GetPacket().sCmd);
-		if (cmd < 0) {
-			break;
-		}
-		pFileInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	}
-	pClient->CloseSocket();
 	TRACE("[客户端]file_count = %d\n", count);
 }
 
@@ -393,7 +383,7 @@ void CRemoteClientDlg::OnDelFile()
 			TRACE("删除文件失败，ret = %d\r\n", ret);
 			return;
 		}
-		m_List.DeleteItem(nListSelected);	//列表中删除对应item
+		m_List.DeleteItem(nListSelected);	//列表中删除对应item，偷个懒，正常业务逻辑应该重新获取文件夹消息。
 	}
 }
 

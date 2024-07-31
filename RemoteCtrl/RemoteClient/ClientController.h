@@ -59,25 +59,7 @@ public:
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
 		size_t nLength = 0,
-		std::list<CPacket>* recvPackets = NULL) {
-
-		CClientSocket* pClient = CClientSocket::getInstance();
-
-		HANDLE hEvnet = CreateEvent(NULL, TRUE, FALSE, NULL);
-		
-		std::list<CPacket> lstPackets;
-		if (recvPackets == NULL) {
-			recvPackets = &lstPackets;
-		}
-
-		pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvnet), *recvPackets);
-		
-		if (recvPackets->size() > 0) {
-			return recvPackets->front().sCmd;
-		}
-
-		return -1;
-	}
+		std::list<CPacket>* recvPackets = NULL);
 
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();

@@ -102,6 +102,7 @@ void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 				SRCCOPY);
 
 			m_picture.InvalidateRect(NULL);		//通知画面重绘
+			m_image.Destroy(); 
 			m_isFull = false;
 		}
 	}

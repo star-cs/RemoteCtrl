@@ -227,7 +227,7 @@ public:
 		return -1;
 	}
 	
-	bool SendPacket(CPacket pack, std::list<CPacket>& recvPackets);
+	bool SendPacket(CPacket pack, std::list<CPacket>& recvPackets, bool isAutoClose);
 
 	bool GetFilePath(std::string& strPath) {
 		if ((m_packet.sCmd == 2) || (m_packet.sCmd == 3) || (m_packet.sCmd == 4))
@@ -265,8 +265,8 @@ public:
 
 private:
 	std::list<CPacket> m_listSendPacket;	//要发送的数据包
-	std::map<HANDLE, std::list<CPacket>> m_mapRecvPacket;	// 事件句柄，以及接收到的数据包。
-
+	std::map<HANDLE, std::list<CPacket>&> m_mapRecvPacket;	// 事件句柄，以及接收到的数据包。
+	std::map<HANDLE, bool> m_mapAutoClosed;					//长短连接标记
 	std::vector<char> m_buffer;
 
 	int m_nIP;
