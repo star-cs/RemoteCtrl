@@ -90,6 +90,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
 	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADD_SERVER, &CRemoteClientDlg::OnIpnFieldchangedIpaddServer)
 	ON_EN_CHANGE(IDC_EDIT_PORT, &CRemoteClientDlg::OnEnChangeEditPort)
+	ON_MESSAGE(WM_SEND_PACKET_ACK, &CRemoteClientDlg::OnSendPacketMessageAck)
 END_MESSAGE_MAP()
 
 
@@ -191,86 +192,6 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 }
 
 
-void CRemoteClientDlg::OnBnClickedButTest()
-{
-	CClientController::getInstance()->SendCommandPacket(2024);
-}
-
-
-// 获取磁盘信息
-void CRemoteClientDlg::OnBnClickedBtnFileinfo()
-{
-	CClientController* pController = CClientController::getInstance();
-
-	std::list<CPacket> recvCPakcets;
-	int ret = pController->SendCommandPacket(1, true, NULL, 0, &recvCPakcets);
-	if (ret == -1) {
-		AfxMessageBox(_T("命令处理失败"));
-	}
-
-	std::string drives = recvCPakcets.front().strData;
-
-	std::string dr;
-	m_tree.DeleteAllItems();
-	m_List.DeleteAllItems(); 
-
-	for (size_t i = 0; i < drives.size(); i++)
-	{
-		if (drives[i] == ',') {
-			dr += ":";
-			HTREEITEM hTemp =m_tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
-			dr.clear();
-			continue;
-		}
-		dr += drives[i];
-	}
-}
-
-void CRemoteClientDlg::LoadFileInfo()
- {
-	CPoint ptMouse;
-	GetCursorPos(&ptMouse);
-	m_tree.ScreenToClient(&ptMouse);
-	HTREEITEM hTreeSelected = m_tree.HitTest(ptMouse, 0);
-	if (hTreeSelected == NULL) {
-		return;
-	}
-
-	DeleteTreeChildrenItem(hTreeSelected);
-	m_List.DeleteAllItems();
-
-	CString strPath = GetPath(hTreeSelected);
-
-	std::list<CPacket> recvCPackets;
-	int nCmd = CClientController::getInstance()->SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength() , &recvCPackets);
-	
-	int count = 0;
-	if (recvCPackets.size() > 0) {
-		std::list<CPacket>::iterator it = recvCPackets.begin();
-		for (; it != recvCPackets.end(); it++) {
-			PFILEINFO pFileInfo = (PFILEINFO)(*it).strData.c_str();
-			count++;
-			if (pFileInfo->HasNext == FALSE) continue;
-			if (pFileInfo->IsDirectory) {
-				//目录添加到左侧的树状里。
-				if (CString(pFileInfo->szFileName) == "." || (CString(pFileInfo->szFileName) == ".."))
-				{
-					continue;
-				}
-
-				HTREEITEM hTemp = m_tree.InsertItem(pFileInfo->szFileName, hTreeSelected, TVI_LAST);
-				m_tree.InsertItem("", hTemp, TVI_LAST);
-			}
-			else {
-				//文件添加到右侧的列表中。
-				m_List.InsertItem(0, pFileInfo->szFileName);
-			}
-		}
-	}
-	TRACE("[客户端]file_count = %d\n", count);
-}
-
-
 CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 {
 	CString strRet, strTemp;
@@ -285,7 +206,6 @@ CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 	return strRet;
 }
 
-
 //避免多次双击同一个节点，每次双击前都得清除掉节点的子节点。
 void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
 {
@@ -297,19 +217,165 @@ void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
 }
 
 
+//加载当前被选中句柄的全部文件(使用在删除文件之后重新加载所有文件到显示列表中)
+void CRemoteClientDlg::LoadFileCurrent()
+{
+	HTREEITEM hTree = m_tree.GetSelectedItem();
+	CString strPath = GetPath(hTree);
+
+	m_List.DeleteAllItems();
+
+	bool nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false,
+		(BYTE*)(LPCTSTR)strPath, strPath.GetLength(), (WPARAM)hTree);
+}
+
+//不同nCmd调用不同结果处理函数 strData:结果数据 lParam：附带参数(树节点句柄/文件指针)
+void CRemoteClientDlg::DealCommand(WORD nCmd, const std::string& strData, LPARAM lParam)
+{
+	switch (nCmd)
+	{
+	case 1:
+		Str2DriveTree(strData, m_tree);
+		break;
+	case 2:
+		UpdateFileInfo(*(PFILEINFO)strData.c_str(), (HTREEITEM)lParam);
+		break;
+	case 3:
+		MessageBox("打开文件完成！", "操作成功", MB_ICONINFORMATION);
+		break;
+	case 4:
+		UpdateDownloadFile(strData, (FILE*)lParam);
+		break;
+	case 9:
+		MessageBox("删除文件完成!", "操作完成", MB_ICONINFORMATION);
+		break;
+	case 2024://测试连接
+		MessageBox("连接测试成功!", "连接成功", MB_ICONINFORMATION);
+		break;
+	default:
+		TRACE("unknow data received!%d\r\n", nCmd);
+		break;
+	}
+}
+
+// =====功能性函数
+void CRemoteClientDlg::Str2DriveTree(std::string data, CTreeCtrl& tree)
+{
+	//只有一个应答包
+	std::string drives = data;
+
+	std::string dr;
+	m_tree.DeleteAllItems();
+	m_List.DeleteAllItems();
+
+	for (size_t i = 0; i < drives.size(); i++)
+	{
+		if (drives[i] == ',') {
+			dr += ":";
+			HTREEITEM hTemp = m_tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+			dr.clear();
+			continue;
+		}
+		dr += drives[i];
+	}
+}
+
+void CRemoteClientDlg::UpdateFileInfo(FILEINFO& fileInfo, HTREEITEM hTreeSelected)
+{
+	//最后还有一个应答包
+	if (fileInfo.HasNext == false) return;
+
+	TRACE("fileInfo.szFileName = %s\r\n", fileInfo.szFileName);
+
+	if (fileInfo.IsDirectory) {
+		//目录添加到左侧的树状里。
+		if (CString(fileInfo.szFileName) == "." || (CString(fileInfo.szFileName) == ".."))
+		{
+			return;
+		}
+		HTREEITEM hTemp = m_tree.InsertItem(fileInfo.szFileName, hTreeSelected, TVI_LAST);
+		m_tree.Expand(hTreeSelected, TVE_EXPAND);//展开选项
+	}
+	else {
+		//文件添加到右侧的列表中。
+		m_List.InsertItem(0, fileInfo.szFileName);
+	}
+}
+
+void CRemoteClientDlg::UpdateDownloadFile(const std::string& strData, FILE* pFile)
+{
+	static long long nLength = 0, index = 0;
+	if (nLength == 0) {	//第一个包
+		nLength = *(long long*)strData.c_str();
+		if (nLength == 0) {
+			AfxMessageBox("文件长度为零或者无法读取文件!!!");
+			CClientController::getInstance()->DownloadEnd();//结束下载
+			return;
+		}
+	}
+	else if ((nLength > 0) && (index >= nLength)) {		//写完了，最后还会发一个结束的通知包
+		fclose(pFile);
+		nLength = 0;
+		index = 0;
+		CClientController::getInstance()->DownloadEnd();//结束下载
+	}
+	else {
+		fwrite(strData.c_str(), 1, strData.size(), pFile);
+		index += strData.size();
+
+		double cur_portion = index * 100.0 / nLength;
+		CClientController::getInstance()->setStatus(cur_portion);
+	}
+}
+// =====
+
+
+// =====以下函数 消息响应调用函数，负责发送命令
+void CRemoteClientDlg::OnBnClickedButTest()
+{
+	CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2024);
+}
+
+void CRemoteClientDlg::OnBnClickedBtnFileinfo()
+{
+	CClientController* pController = CClientController::getInstance();
+
+	bool ret = pController->SendCommandPacket(GetSafeHwnd(), 1, true, NULL, 0);
+	if (ret == false) {
+		AfxMessageBox(_T("命令处理失败"));
+	}
+}
+
+void CRemoteClientDlg::LoadFileInfo()
+{
+	CPoint ptMouse;
+	GetCursorPos(&ptMouse);
+	m_tree.ScreenToClient(&ptMouse);
+	HTREEITEM hTreeSelected = m_tree.HitTest(ptMouse, 0);
+	if (hTreeSelected == NULL) {
+		return;
+	}
+
+	DeleteTreeChildrenItem(hTreeSelected);
+	m_List.DeleteAllItems();
+
+	CString strPath = GetPath(hTreeSelected);
+
+	bool nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2, false,
+		(BYTE*)(LPCTSTR)strPath, strPath.GetLength(), (WPARAM)hTreeSelected);
+
+}
+
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
 	LoadFileInfo();
 }
-
-
 void CRemoteClientDlg::OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
 	LoadFileInfo();
 }
-
 
 void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 {
@@ -334,7 +400,6 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 }
 
-
 void CRemoteClientDlg::OnDownloadFile()
 {
 	int nListSelected = m_List.GetSelectionMark();
@@ -344,12 +409,11 @@ void CRemoteClientDlg::OnDownloadFile()
 	strPath = GetPath(hSelected) + strPath;
 
 	int ret = CClientController::getInstance()->DownFile(strPath);
-	if (ret != 0) {
+	if (ret != 1) {
 		MessageBox(TEXT("下载失败!"));
 		TRACE("下载失败 ret = %d\r\n", ret);
 	}
 }
-
 
 void CRemoteClientDlg::OnRunFile()
 {
@@ -359,13 +423,13 @@ void CRemoteClientDlg::OnRunFile()
 	HTREEITEM filePath = m_tree.GetSelectedItem();
 	strPath = GetPath(filePath) + strPath;
 
-	int ret = CClientController::getInstance()->SendCommandPacket(3, true, (BYTE*)(LPCSTR)strPath, strPath.GetLength());
-	if (ret != 3) {
+	bool ret = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 3, 
+		true, (BYTE*)(LPCSTR)strPath, strPath.GetLength());
+	if (ret == false) {
 		AfxMessageBox("启动文件失败！");
 		TRACE("启动文件失败，ret = %d\r\n", ret);
 	}
 }
-
 
 void CRemoteClientDlg::OnDelFile()
 {
@@ -377,13 +441,14 @@ void CRemoteClientDlg::OnDelFile()
 	strPath = GetPath(filePath) + strPath;
 	int result = AfxMessageBox(_T("你确定要删除这个文件吗？"), MB_YESNO | MB_ICONQUESTION);
 	if (result == IDYES) {
-		int ret = CClientController::getInstance()->SendCommandPacket(9, true, (BYTE*)(LPCSTR)strPath, strPath.GetLength());
-		if (ret != 9) {
+		bool ret = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 9, true,
+			(BYTE*)(LPCSTR)strPath, strPath.GetLength());
+		if (!ret) {
 			AfxMessageBox("删除文件失败");
 			TRACE("删除文件失败，ret = %d\r\n", ret);
 			return;
 		}
-		m_List.DeleteItem(nListSelected);	//列表中删除对应item，偷个懒，正常业务逻辑应该重新获取文件夹消息。
+		LoadFileCurrent();
 	}
 }
 
@@ -403,8 +468,6 @@ void CRemoteClientDlg::OnIpnFieldchangedIpaddServer(NMHDR* pNMHDR, LRESULT* pRes
 	CClientController* pController = CClientController::getInstance();
 	pController->UpdataAddress(m_server_address, atoi((LPCTSTR)m_nPort));
 }
-
-
 void CRemoteClientDlg::OnEnChangeEditPort()
 {
 	// TODO:  如果该控件是 RICHEDIT 控件，它将不
@@ -417,4 +480,25 @@ void CRemoteClientDlg::OnEnChangeEditPort()
 	CClientController* pController = CClientController::getInstance();
 	pController->UpdataAddress(m_server_address, atoi((LPCTSTR)m_nPort));
 
+}
+
+LRESULT CRemoteClientDlg::OnSendPacketMessageAck(WPARAM wParam, LPARAM lParam)
+{
+	if ((lParam == -1) || (lParam == -2)) {
+		TRACE("socket is error %d\r\n", lParam);
+	}
+	else if (lParam == 1)	//对面关闭了套接字
+	{
+		TRACE("socket is closed!\r\n");
+	}
+	else
+	{
+		if (wParam != NULL) {
+			CPacket pack = *(CPacket*)wParam;
+			delete (CPacket*)wParam;
+			DealCommand(pack.sCmd, pack.strData, lParam);
+		}
+		return 1;
+	}
+	return 0;
 }

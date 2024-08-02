@@ -1,31 +1,14 @@
 #include "pch.h"
 #include "ClientController.h"
 
-std::map<UINT, CClientController::MSGFUNC> CClientController::m_mapFunc;
-
 CClientController* CClientController::m_instance = NULL;
 
 CClientController::CHelper CClientController::m_helper;
 
-int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, std::list<CPacket>* recvPackets)
+bool CClientController::SendCommandPacket(HWND hWnd, int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, WPARAM wParam)
 {
 	CClientSocket* pClient = CClientSocket::getInstance();
-
-	HANDLE hEvnet = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-	std::list<CPacket> lstPackets;
-	if (recvPackets == NULL) {
-		recvPackets = &lstPackets;
-	}
-
-	pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvnet), *recvPackets, bAutoClose);
-
-	CloseHandle(hEvnet);
-	if (recvPackets->size() > 0) {
-		return recvPackets->front().sCmd;
-	}
-
-	return -1;
+	return pClient->SendPacket(hWnd, CPacket(nCmd, pData, nLength), bAutoClose, wParam);
 }
 
 int CClientController::DownFile(CString strPath)
@@ -38,18 +21,31 @@ int CClientController::DownFile(CString strPath)
 		m_strRemote = strPath;
 		m_strLocal = dlg.GetPathName();
 
-		m_hThreadDown = (HANDLE)_beginthread(&CClientController::threadEntryForDownloadFile, 0, this);
-		// 刚创建，没被wait。此时线程开始执行。
-		if (WaitForSingleObject(m_hThreadDown, 0) != WAIT_TIMEOUT) {
+		FILE* pFile = fopen(m_strLocal, "wb+");
+		if (pFile == NULL) {
+			AfxMessageBox(_T("本地没有权限保存该文件，或者文件无法创建!!!"));
 			return -1;
 		}
+
+		SendCommandPacket(m_remoteDlg.GetSafeHwnd(), 4, false, 
+			(BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength(), (WPARAM)pFile);
+
 		m_remoteDlg.BeginWaitCursor();		// 设置光标为等待状态。
 		m_statusDlg.m_info.SetWindowText(_T("命令执行中..."));
+		m_statusDlg.download_process.SetRange(0, 100);
 		m_statusDlg.ShowWindow(SW_SHOW);
 		m_statusDlg.CenterWindow(&m_remoteDlg);
 		m_statusDlg.SetActiveWindow();
 	}
-	return 0;
+	return 1;
+}
+
+void CClientController::DownloadEnd()
+{
+	m_statusDlg.ShowWindow(SW_HIDE);
+	m_remoteDlg.EndWaitCursor();
+	m_remoteDlg.MessageBox(TEXT("下载完成!!"), TEXT("完成"));
+	TRACE("下载完成\r\n");
 }
 
 void CClientController::StartWatchScreen()
@@ -75,8 +71,8 @@ CClientController::CClientController() :
 		UINT nMsg;
 		MSGFUNC func;
 	}data[] = {
-		{WM_SEND_PACK, &CClientController::OnShowStatus},
-		{WM_SEND_PACK, &CClientController::OnShowWatcher},
+		{WM_SEND_STATUS, &CClientController::OnShowStatus},
+		{WM_SEND_WATCH, &CClientController::OnShowWatcher},
 		{(UINT)-1, NULL},
 	};
 
@@ -130,94 +126,24 @@ void __stdcall CClientController::threadEntryForWatchScreen(void* arg)
 void CClientController::threadWatchScreen()
 {
 	Sleep(50);
+	ULONGLONG nTick = GetTickCount64();
 	while (!m_isClose) {
+		if (GetTickCount64() - nTick < 50)
+		{
+			Sleep(50 - DWORD(GetTickCount64() - nTick));
+		}
+		nTick = GetTickCount64();
+
 		if (m_watchDlg.isFull() == false) {
-			std::list<CPacket> recvPackets;
-			int ret = SendCommandPacket(6, true, NULL , 0, &recvPackets);
-			if (ret == 6) {
-				if (CTool::Byte2Image(m_watchDlg.GetImage(), recvPackets.front().strData) == 0) {
-					m_watchDlg.setImageStatus(true);
-				}
-				else {
-					TRACE("获取图片失败！\r\n");
-				}
+			bool ret = SendCommandPacket(m_watchDlg.GetSafeHwnd(), 6, true, NULL , 0);
+			if (ret == false) {
+				TRACE("获取图片失败，屏幕监控命令失败\r\n");
 			}
 		}
-		else {
-			Sleep(1);
-		}
+
+		Sleep(1);
 	}
 }
-
-
-void __stdcall CClientController::threadEntryForDownloadFile(void* arg)
-{
-	CClientController* thiz = (CClientController*)arg;
-	thiz->threadForDownloadFile();
-	_endthreadex(0);
-}
-
-
-void CClientController::threadForDownloadFile()
-{
-	FILE* pFile = fopen(m_strLocal, "wb+");
-	if (pFile == NULL) {
-		AfxMessageBox("没有权限保存该文件，或者文件无法创建！！！");
-		m_statusDlg.ShowWindow(SW_HIDE);
-		m_remoteDlg.EndWaitCursor();
-		return;
-	}
-	TRACE("[客户端]%s\r\n", LPCSTR(m_strRemote));
-
-
-	CClientController* pController = CClientController::getInstance();
-	std::list<CPacket> recvCPackets;
-
-	do {
-		int ret = pController->SendCommandPacket(4, false, (BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength(), &recvCPackets);
-		if (ret < 0) {
-			AfxMessageBox("执行下载命令失败！");
-			TRACE("执行下载命令失败，ret = %d\r\n", ret);
-			break;
-		}
-		long long nLength = *(long long*)recvCPackets.front().strData.c_str(); //待下载的文件长度
-		if (nLength == 0) {
-			AfxMessageBox("文件长度为零，或者无法读取文件！！！");
-			break;
-		}
-
-		recvCPackets.pop_front();
-
-		// CString --> LPCSTR --> BYTE*
-		m_statusDlg.download_process.SetRange(0, 100);
-		long long nCount = 0;
-		while (nCount < nLength)
-		{
-			double cur_portion = nCount * 100.0 / nLength;
-			m_statusDlg.download_process.SetPos(cur_portion);
-
-			CString temp;
-			temp.Format(_T("命令执行中 进度 = %f %%"), cur_portion);
-			m_statusDlg.m_info.SetWindowText(temp);
-
-			CPacket cur = recvCPackets.front();
-
-			size_t cur_size = cur.strData.size();
-
-			fwrite(cur.strData.c_str(), 1, cur_size, pFile);
-
-			nCount += cur_size;
-
-			recvCPackets.pop_front();
-		}
-
-		if(nCount == nLength) m_remoteDlg.MessageBox(_T("下载完成！"), _T("完成"));
-	} while (0);
-	fclose(pFile);
-	m_statusDlg.ShowWindow(SW_HIDE);
-	m_remoteDlg.EndWaitCursor();
-}
-
 
 
 unsigned __stdcall CClientController::threadEntry(void* arg)
@@ -268,4 +194,14 @@ LRESULT CClientController::OnShowStatus(UINT nMsg, WPARAM wParam, LPARAM lParam)
 LRESULT CClientController::OnShowWatcher(UINT nMsg, WPARAM wParam, LPARAM lParam)
 {
 	return m_watchDlg.DoModal();
+}
+
+void CClientController::setStatus(double cur_position)
+{
+	m_statusDlg.download_process.SetPos(cur_position);
+
+	CString temp;
+	temp.Format(_T("命令执行中 进度 = %f %%"), cur_position);
+
+	m_statusDlg.m_info.SetWindowText(temp);
 }

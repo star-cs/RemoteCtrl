@@ -9,8 +9,7 @@
 #include "resource.h"
 #include "Tool.h"
 
-#define WM_SEND_PACK (WM_USER + 1)	//发送包数据
-#define WM_SEND_DATA (WM_USER+2)	//发送数据
+//#define WM_SEND_DATA (WM_USER+2)	//发送数据
 #define WM_SEND_STATUS (WM_USER+3)	//显示状态
 #define WM_SEND_WATCH (WM_USER+4)	//远程监控
 #define WM_SEND_MESSAGE (WM_USER+0x1000) //自定义消息处理
@@ -52,14 +51,14 @@ public:
 	// 7 锁机
 	// 8 解锁
 	// 2024 测试连接
-	// 返回cmd，失败返回-1。
-	// 默认，只接收一次数据就关闭连接。
-	int SendCommandPacket(
+	// 返回值：是状态，true是成功，false是失败。
+	bool SendCommandPacket(
+		HWND hWnd,
 		int nCmd,
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
 		size_t nLength = 0,
-		std::list<CPacket>* recvPackets = NULL);
+		WPARAM wParam = 0);
 
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();
@@ -67,8 +66,12 @@ public:
 	}
 
 	int DownFile(CString strPath);
-	
+	void DownloadEnd();
+
 	void StartWatchScreen();
+
+	//下载进度条
+	void setStatus(double cur_position);
 
 protected:
 	CClientController();
@@ -97,6 +100,8 @@ protected:
 	LRESULT OnShowStatus(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowWatcher(UINT nMsg, WPARAM wParam, LPARAM lParam);
 
+	
+
 private:
 	typedef struct MsgInfo {
 		MSG msg;
@@ -119,7 +124,7 @@ private:
 	}MSGINFO;
 
 	typedef LRESULT(CClientController::* MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lPAram);
-	static std::map<UINT, MSGFUNC> m_mapFunc;
+	std::map<UINT, MSGFUNC> m_mapFunc;
 	
 	CWatchDlg m_watchDlg;
 	CRemoteClientDlg m_remoteDlg;

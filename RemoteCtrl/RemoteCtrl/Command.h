@@ -224,9 +224,11 @@ protected:
             size_t rlen = 0;
             do {
                 rlen = fread(buffer, 1, 1024, pFile);
-
-                listPackets.push_back(CPacket(4, (BYTE*)&buffer, rlen));
-
+                //如果文件大小是1024的整数倍那么，就会发出去一个空包结尾。
+                if (rlen > 0) {
+                    listPackets.push_back(CPacket(4, (BYTE*)&buffer, rlen));
+                }
+                    
             } while (rlen >= 1024);
 
             fclose(pFile);

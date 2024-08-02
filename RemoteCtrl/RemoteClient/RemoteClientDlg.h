@@ -1,9 +1,14 @@
 ﻿
 // RemoteClientDlg.h: 头文件
 //
-
 #pragma once
 #include "StatusDlg.h"
+
+#ifdef WM_SEND_PACKET_ACK
+#define WM_SEND_PACKET_ACK (WM_USER + 2)	//接收数据包
+#endif // WM_SEND_PACKET_ACK
+#include <string>
+#include "ClientSocket.h"
 
 // CRemoteClientDlg 对话框
 class CRemoteClientDlg : public CDialogEx
@@ -27,6 +32,14 @@ private:
 	CString GetPath(HTREEITEM hTree);
 
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
+
+	void LoadFileCurrent();
+
+	void DealCommand(WORD nCmd, const std::string& strData, LPARAM lParam);
+
+	void Str2DriveTree(std::string data, CTreeCtrl& tree);
+	void UpdateFileInfo(FILEINFO& fileInfo, HTREEITEM hTreeSelected);
+	void UpdateDownloadFile(const std::string& strData, FILE* pFile);
 
 // 实现
 protected:
@@ -57,4 +70,6 @@ public:
 	afx_msg void OnBnClickedBtnStartWatch();
 	afx_msg void OnIpnFieldchangedIpaddServer(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnEnChangeEditPort();
+	
+	afx_msg LRESULT OnSendPacketMessageAck(WPARAM wParam, LPARAM lParam);
 };

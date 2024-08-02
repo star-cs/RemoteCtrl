@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "ClientSocket.h"
+#include "Tool.h"
 
 
 CClientSocket* CClientSocket::m_instance = NULL;
@@ -26,101 +27,139 @@ std::string GetErrInfo(int wsaErrCode)
 }
 
 
-bool CClientSocket::SendPacket(CPacket pack, std::list<CPacket>& recvPackets, bool isAutoClosed)
+bool CClientSocket::InitSocket()
 {
-	if (cli_sock == INVALID_SOCKET) {
-		// 正式发送包的时候，IP和Port会固定下来了。
-		//if (InitSocket() == false) return false;
-		//启动线程
-		_beginthread(&CClientSocket::threadEntry, 0, this);
+	if (cli_sock != INVALID_SOCKET) {
+		CloseSocket();
 	}
-	
-	m_mapRecvPacket.insert(std::pair<HANDLE, std::list<CPacket>&>(pack.hEvent, recvPackets));
-	m_mapAutoClosed.insert(std::pair<HANDLE, bool>(pack.hEvent, isAutoClosed));
-	TRACE("cmd:%d event:%08X threadId:%ld \r\n", pack.sCmd, pack.hEvent, GetCurrentThreadId());
-	m_listSendPacket.push_back(pack); 
-	WaitForSingleObject(pack.hEvent, INFINITE);
+	cli_sock = socket(PF_INET, SOCK_STREAM, 0);
+	if (cli_sock == -1) return false;
+	sockaddr_in server_addr;
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = htonl(m_nIP);
+	server_addr.sin_port = htons(m_nPort);
 
-	auto it = m_mapRecvPacket.find(pack.hEvent);
-	if (it != m_mapRecvPacket.end()) {
-		m_mapRecvPacket.erase(it);
+	if (server_addr.sin_addr.s_addr == INADDR_NONE) {
+		AfxMessageBox(_T("指定的Ip地址不存在！"));
+		return false;
 	}
 
-	auto it0 = m_mapAutoClosed.find(pack.hEvent);
-	if (it0 != m_mapAutoClosed.end()) {
-		m_mapAutoClosed.erase(it0);
-	}
+	int ret = connect(cli_sock, (sockaddr*)&server_addr, sizeof(sockaddr));
 
-	return false;
+	if (ret == -1) {
+		AfxMessageBox(_T("conncet连接失败！"));
+		TRACE("[客户端]连接失败：%d %s\r\n", WSAGetLastError(), GetErrInfo(WSAGetLastError()).c_str());
+		return false;
+	}
+	return true;
 }
 
-void CClientSocket::threadEntry(void* arg)
+
+bool CClientSocket::SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed, WPARAM AttParam)
+{
+	// TODO：存在消息发送过于频繁，即使关闭了相关的窗口或者停止发送。消息队列里还有剩余的消息。
+	UINT nMode = isAutoClosed ? CSM_AUTOCLOSE : 0;
+
+	std::string strOut;
+	pack.Data(strOut);
+
+	PACKET_DATA* pData = new PACKET_DATA(strOut.c_str(), strOut.size(), nMode, AttParam);
+	bool ret = PostThreadMessage(m_nThreadID, WM_SEND_PACK, (WPARAM)pData, (LPARAM)hWnd);
+	if (ret == false) {
+		TRACE("PostThreadMessage error : %d \r\n", ::GetLastError());
+		delete pData;
+	}
+	return ret;
+}
+
+//处理发送命令消息函数
+void CClientSocket::SendPack(UINT message, WPARAM wParam, LPARAM lParam)
+{
+	PACKET_DATA data = *(PACKET_DATA*)wParam;
+	delete (PACKET_DATA*)wParam;
+
+	// TODO:监控窗口关闭，hWnd没了。消息队列里还有相关的命令。所以提前判断hWnd对应的窗口是否还在。
+	HWND hWnd = (HWND)lParam;
+	if (IsWindow(hWnd) == 0)
+	{
+		return;
+	}
+
+	if (InitSocket() == true) {
+
+		int ret = send(cli_sock, (char*)data.strData.c_str(), (int)data.strData.size(), 0);
+
+		if (ret > 0) {
+			size_t index = 0;
+			std::string strBufer;
+			strBufer.resize(BUFFER_SIZE);
+			char* pBuffer = (char*)strBufer.c_str();
+
+			while (cli_sock != INVALID_SOCKET) {
+				int len = recv(cli_sock, pBuffer + index, BUFFER_SIZE - index, 0);
+				TRACE("index = %d , len = %d \r\n", index, len);
+				if ((len > 0) || (index > 0)) {
+					index += (size_t)len;
+					size_t nLen = index;
+					CPacket pack((BYTE*)pBuffer, nLen);
+					if (nLen > 0) {
+						if (IsWindow(hWnd) != 0)
+						{
+							CPacket* temp = new CPacket(pack);
+ 							LRESULT ret = ::SendMessage(hWnd, WM_SEND_PACKET_ACK, (WPARAM)temp, data.AttParam);
+							//bool ret = ::PostMessage(hWnd, WM_SEND_PACKET_ACK, (WPARAM)temp, data.AttParam);	//发到窗口队列里，窗口关闭，队列取消，但是这个pack堆空间没法释放。
+							//TRACE("ret = %d\r\n", ret);
+							if (ret	== 0) {
+								//发送的当时，窗口刚好关闭，发送失败。
+								delete temp;
+							}
+						}
+
+
+						if (data.nMode & CSM_AUTOCLOSE) {
+							CloseSocket();
+							return;
+						}
+						index -= nLen;
+						memmove(pBuffer, pBuffer + nLen, index);
+					}
+				}
+				else {
+					CloseSocket();
+					::SendMessage(hWnd, WM_SEND_PACKET_ACK, NULL, 1);
+				}
+			}
+		}
+		else {
+			CloseSocket();
+			::SendMessage(hWnd, WM_SEND_PACKET_ACK, NULL, -1);
+		}
+	}
+	else {
+		::SendMessage(hWnd, WM_SEND_PACKET_ACK, NULL, -2);
+	}
+}
+
+unsigned CClientSocket::threadEntry(void* arg)
 {
 	CClientSocket* thiz = (CClientSocket*)arg;
 	thiz->threadFunc();
 	ExitThread(0);
+	return 0;
 }
 
 void CClientSocket::threadFunc()
 {
-	std::string strBuffer;
-	strBuffer.resize(BUFFER_SIZE);
-	char* pBuffer = (char*)strBuffer.c_str();
+	SetEvent(m_eventInvoke);
 
-	int index = 0;
-	
-	InitSocket();
+	MSG msg;
+	while (::GetMessage(&msg, NULL, 0, 0)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
 
-	while (cli_sock != INVALID_SOCKET)
-	{
-		if (m_listSendPacket.size() > 0) 
-		{
-			TRACE("[客户端] m_listSendPacket.size() = %d \r\n", m_listSendPacket.size());
-			CPacket& head = m_listSendPacket.front();
-			if (Send(head) == false)
-			{
-				TRACE("发送失败\r\n");
-				continue;
-			}
-
-			auto it = m_mapRecvPacket.find(head.hEvent);
-			if (it != m_mapRecvPacket.end())
-			{
-				auto it0 = m_mapAutoClosed.find(head.hEvent);
-				do {
-					int length = recv(cli_sock, pBuffer + index, BUFFER_SIZE - index, 0);
-					TRACE("[客户端] index = %d , length = %d, AutoClose = %d \r\n", index, length, (int)it0->second);
-					
-					if (length > 0 || index > 0) {
-						index += length;
-						size_t size = (size_t)index;
-						CPacket pack((const BYTE*)pBuffer, size);
-						if (size > 0) {
-							memmove(pBuffer, pBuffer + size, index - size);
-							index -= size;
-
-							pack.hEvent = head.hEvent;
-							it->second.push_back(pack);
-							if (it0->second)
-							{
-								SetEvent(head.hEvent);
-							}
-						}
-					}
-					else if (length <= 0 && index <= 0)
-					{
-						CloseSocket();
-						SetEvent(head.hEvent);
-						m_mapAutoClosed.erase(it0);
-						break;
-					}
-				} while (it0->second == false);
-
-				m_listSendPacket.pop_front();
-				
-				if (InitSocket() == false) InitSocket();
-			}
+		if (m_mapFunc.find(msg.message) != m_mapFunc.end()) {
+			(this->*m_mapFunc[msg.message])(msg.message, msg.wParam, msg.lParam);
 		}
 	}
-	CloseSocket();
+
 }

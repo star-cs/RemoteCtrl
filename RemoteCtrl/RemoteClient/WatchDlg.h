@@ -2,6 +2,9 @@
 #include "afxdialogex.h"
 #include "ClientSocket.h"
 
+#ifdef WM_SEND_PACKET_ACK
+#define WM_SEND_PACKET_ACK (WM_USER + 2)	//接收数据包
+#endif // WM_SEND_PACKET_ACK
 
 // CWatchDlg 对话框
 
@@ -54,6 +57,9 @@ public:
 	virtual void OnOK();
 	afx_msg void OnLockBtn();
 	afx_msg void OnUnlockBtn();
+
+	afx_msg LRESULT OnSendPacketMessageAck(WPARAM wParam, LPARAM lParam);
+
 	
 private:
 	bool m_isFull;	// 缓存是否填充
