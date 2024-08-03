@@ -362,3 +362,16 @@ int SendScreen()
     函数成功执行后返回0。
 
 确保在实际使用中处理好错误条件，比如`GlobalAlloc`失败的情况，以及在`CServerSocket::Send`中可能出现的网络错误。此外，对于多显示器系统，你可能需要修改代码来处理每个显示器，而不是只捕获主显示器的屏幕。
+
+
+# 申请 管理员权限启动
+项目 - 属性 - 链接器 - 清单文件 - UAC执行级别 asInvoker (/level='asInvoker')
+项目 - 属性 - 高级 - MFC的使用（在静态库中使用MFC） (最后生成一个exe文件)
+
+# 开机启动 - 注册表 
+
+```shell
+mklink RemoteCtrl.exe  C:\xxx\xxx\RemoteCtrl.exe
+
+\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+```

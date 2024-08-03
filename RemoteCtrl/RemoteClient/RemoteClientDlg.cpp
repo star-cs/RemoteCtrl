@@ -86,7 +86,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
-	ON_COMMAND(ID_DEL_FILE, &CRemoteClientDlg::OnDelFile)
+	ON_COMMAND(ID_DEL_FILE, &CRemoteClientDlg::OnDeleteFile)
 	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
 	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADD_SERVER, &CRemoteClientDlg::OnIpnFieldchangedIpaddServer)
 	ON_EN_CHANGE(IDC_EDIT_PORT, &CRemoteClientDlg::OnEnChangeEditPort)
@@ -125,19 +125,7 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// 设置大图标
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
-	// TODO: 在此添加额外的初始化代码
-	UpdateData();
-	//m_server_address = 0x7F000001;
-	//192.168.56.1
-	m_server_address = 0xc0a83865;
-	m_nPort = _T("9527");
-	CClientController* pController = CClientController::getInstance();
-	pController->UpdataAddress(m_server_address, atoi((LPCTSTR)m_nPort)); 
-	UpdateData(FALSE);
-	
-	// 初始化窗口
-	m_StatusDlg.Create(IDD_DLG_STATUS, this);
-	m_StatusDlg.ShowWindow(SW_HIDE);
+	InitUIData();
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -191,6 +179,22 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+void CRemoteClientDlg::InitUIData()
+{
+	// TODO: 在此添加额外的初始化代码
+	UpdateData();
+	//m_server_address = 0x7F000001;
+	//192.168.56.1
+	m_server_address = 0xc0a83865;
+	m_nPort = _T("9527");
+	CClientController* pController = CClientController::getInstance();
+	pController->UpdataAddress(m_server_address, atoi((LPCTSTR)m_nPort));
+	UpdateData(FALSE);
+
+	// 初始化窗口
+	m_StatusDlg.Create(IDD_DLG_STATUS, this);
+	m_StatusDlg.ShowWindow(SW_HIDE);
+}
 
 CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 {
@@ -258,7 +262,7 @@ void CRemoteClientDlg::DealCommand(WORD nCmd, const std::string& strData, LPARAM
 	}
 }
 
-// =====功能性函数
+// =====功能性函数 Start
 void CRemoteClientDlg::Str2DriveTree(std::string data, CTreeCtrl& tree)
 {
 	//只有一个应答包
@@ -294,6 +298,7 @@ void CRemoteClientDlg::UpdateFileInfo(FILEINFO& fileInfo, HTREEITEM hTreeSelecte
 			return;
 		}
 		HTREEITEM hTemp = m_tree.InsertItem(fileInfo.szFileName, hTreeSelected, TVI_LAST);
+		m_tree.InsertItem("", hTemp, TVI_LAST);
 		m_tree.Expand(hTreeSelected, TVE_EXPAND);//展开选项
 	}
 	else {
@@ -327,10 +332,10 @@ void CRemoteClientDlg::UpdateDownloadFile(const std::string& strData, FILE* pFil
 		CClientController::getInstance()->setStatus(cur_portion);
 	}
 }
-// =====
+// =====功能性函数 End
 
 
-// =====以下函数 消息响应调用函数，负责发送命令
+// =====以下函数 消息响应调用函数，负责发送命令 Start
 void CRemoteClientDlg::OnBnClickedButTest()
 {
 	CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2024);
@@ -431,7 +436,7 @@ void CRemoteClientDlg::OnRunFile()
 	}
 }
 
-void CRemoteClientDlg::OnDelFile()
+void CRemoteClientDlg::OnDeleteFile()
 {
 	// TODO: 在此添加命令处理程序代码
 	int nListSelected = m_List.GetSelectionMark();
@@ -452,11 +457,12 @@ void CRemoteClientDlg::OnDelFile()
 	}
 }
 
-
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
 	CClientController::getInstance()->StartWatchScreen();
 }
+
+// =====以下函数 消息响应调用函数，负责发送命令 End
 
 
 void CRemoteClientDlg::OnIpnFieldchangedIpaddServer(NMHDR* pNMHDR, LRESULT* pResult)

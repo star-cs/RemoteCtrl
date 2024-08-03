@@ -29,7 +29,7 @@ int CClientController::DownFile(CString strPath)
 
 		SendCommandPacket(m_remoteDlg.GetSafeHwnd(), 4, false, 
 			(BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength(), (WPARAM)pFile);
-
+		 
 		m_remoteDlg.BeginWaitCursor();		// 设置光标为等待状态。
 		m_statusDlg.m_info.SetWindowText(_T("命令执行中..."));
 		m_statusDlg.download_process.SetRange(0, 100);
@@ -100,20 +100,6 @@ int CClientController::Invoke(CWnd*& pMainWnd)
 	return m_remoteDlg.DoModal();
 }
 
-LRESULT CClientController::SendMessage(MSG msg)
-{ 
-	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (hEvent == NULL)return -2;
-
-	MSGINFO info(msg);
-	PostThreadMessage(m_nThreadID, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)&hEvent);
-	//通过事件通知，并通过结构体存储结果。
-	WaitForSingleObject(hEvent, INFINITE);
-	CloseHandle(hEvent);
-
-	return info.result;
-}
-
 
 void __stdcall CClientController::threadEntryForWatchScreen(void* arg)
 {
@@ -128,9 +114,9 @@ void CClientController::threadWatchScreen()
 	Sleep(50);
 	ULONGLONG nTick = GetTickCount64();
 	while (!m_isClose) {
-		if (GetTickCount64() - nTick < 50)
+		if (GetTickCount64() - nTick < 1000)
 		{
-			Sleep(50 - DWORD(GetTickCount64() - nTick));
+			Sleep(1000 - DWORD(GetTickCount64() - nTick));
 		}
 		nTick = GetTickCount64();
 

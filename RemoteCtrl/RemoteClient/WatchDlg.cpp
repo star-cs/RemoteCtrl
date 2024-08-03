@@ -300,8 +300,14 @@ LRESULT CWatchDlg::OnSendPacketMessageAck(WPARAM wParam, LPARAM lParam)
 				break;
 			}
 			case 5://鼠标
+				TRACE("远程端应答了 鼠标操作\r\n");
+				break;
 			case 7://锁机
+				TRACE("远程端应答了 锁机操作\r\n");
+				break;
 			case 8://解锁
+				TRACE("远程端应答了 解锁操作\r\n");
+				break;
 			default: 
 				break;
 			}

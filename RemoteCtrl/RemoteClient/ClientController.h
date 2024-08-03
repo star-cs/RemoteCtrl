@@ -25,9 +25,6 @@ public:
 	//Æô¶¯
 	int Invoke(CWnd*& pMainWnd);
 
-	LRESULT SendMessage(MSG msg);
-
-
 	void UpdataAddress(int nIP, int nPort) {
 		CClientSocket::getInstance()->UpdataAddress(nIP, nPort);
 	}
