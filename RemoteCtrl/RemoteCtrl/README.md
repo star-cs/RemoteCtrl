@@ -375,3 +375,6 @@ mklink RemoteCtrl.exe  C:\xxx\xxx\RemoteCtrl.exe
 
 \HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
 ```
+
+# 开机启动2 
+启动exe 添加到 C:\Users\root\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
