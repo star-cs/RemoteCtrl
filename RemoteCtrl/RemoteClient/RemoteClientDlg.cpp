@@ -184,7 +184,8 @@ void CRemoteClientDlg::InitUIData()
 	// TODO: 在此添加额外的初始化代码
 	UpdateData();
 	//m_server_address = 0x7F000001;
-	//192.168.56.1
+	//192.168.56.1 0xc0a83865
+	//192.168.56.101	
 	m_server_address = 0xc0a83865;
 	m_nPort = _T("9527");
 	CClientController* pController = CClientController::getInstance();

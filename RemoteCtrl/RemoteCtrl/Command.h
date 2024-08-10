@@ -85,7 +85,7 @@ protected:
             int y = (rect.bottom - nHeight) / 2;
 
             pText->MoveWindow(x, y, rtText.Width(), rtText.Height());
-            pText->SetWindowText(_T("You have been locked by the system. To unlock, please contact the administrator."));
+            pText->SetWindowText(_T("To unlock, please contact the administrator."));
         }
 
         //´°¿ÚÖÃ¶¥

@@ -369,12 +369,125 @@ int SendScreen()
 项目 - 属性 - 高级 - MFC的使用（在静态库中使用MFC） (最后生成一个exe文件)
 
 # 开机启动 - 注册表 
+```cpp
+    //注意这里32位(SysWOW64)和64位(system32)默认系统变量位置不同
+    #define SYSTEMPATH TEXT("C:\\Windows\\SysWOW64\\RemoteCtrl.exe") 
 
-```shell
-mklink RemoteCtrl.exe  C:\xxx\xxx\RemoteCtrl.exe
+    //设置开机自启：修改注册表方式(登录过程中启动) 
+    //开机自启注册表位置：计算机
+    static int WriteRefisterTable(const CString strPath) {
+        if (PathFileExists(strPath))return 0;//注册表中已经存在
+        
+        // 程序静态库生成，所以不需要软链接了，直接复制文件。
+        char exePath[MAX_PATH] = "";
+        GetModuleFileName(NULL, exePath, MAX_PATH);
+        bool ret = CopyFile(exePath, strPath, FALSE);
+        if (ret == FALSE) {
+            MessageBox(NULL, TEXT("复制文件夹失败，是否权限不足？\r\n"), TEXT("错误"), MB_ICONERROR | MB_TOPMOST);
+            return -1;
+        }
 
-\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+        //打开注册表开启自启位置
+        CString strSubKey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";//注册表开机自启路径
+        HKEY hKey = NULL;
+        int ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, strSubKey, 0, KEY_ALL_ACCESS | KEY_WOW64_64KEY, &hKey);
+        if (ret != ERROR_SUCCESS)
+        {
+            RegCloseKey(hKey);
+            MessageBox(NULL, TEXT("打开注册表失败! 是否权限不足?\r\n"), TEXT("错误"), MB_ICONERROR | MB_TOPMOST);
+            return -2;
+        }
+
+        //将可执行文件添加到注册表开启自启路径下
+        ret = RegSetValueEx(hKey, TEXT("RemoteCtrl"), 0, REG_EXPAND_SZ, (BYTE*)(LPCTSTR)strPath, strPath.GetLength() * sizeof(TCHAR));
+        if (ret != ERROR_SUCCESS)
+        {
+            RegCloseKey(hKey);
+            MessageBox(NULL, TEXT("注册表添加文件失败 是否权限不足?\r\n"), TEXT("错误"), MB_ICONERROR | MB_TOPMOST);
+            return -3;
+        }
+        RegCloseKey(hKey);
+        return 0;
+    }
 ```
 
-# 开机启动2 
-启动exe 添加到 C:\Users\root\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
+# 开机启动2     
+```cpp
+
+    #define STARTUPPATH TEXT("C:\\Users\\root\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\RemoteCtrl.exe")
+
+    //写入自启动文件方式
+    static int WriteStartupDir(const CString& strPath)
+    {
+        if (PathFileExists(strPath))return 0; // 启动文件已经存在
+
+        CString strCmd = GetCommandLine();
+        TRACE("strCmd:%s \r\n", strCmd);        // 运行exe程序的绝对路径
+        strCmd.Replace(TEXT("\""), TEXT(""));
+        BOOL ret = CopyFile(strCmd, strPath, FALSE);
+        if (ret == FALSE)
+        {
+            MessageBox(NULL, TEXT("复制文件夹失败，是否权限不足?\r\n"), TEXT("错误"), MB_ICONERROR | MB_TOPMOST);
+            return -1;
+        }
+        return 0;
+    }
+```
+
+# 管理员
+## 检查管理员权限
+```cpp
+    static bool IsAdmin() {
+        HANDLE hToken = NULL;
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken));
+        {
+            ShowError();
+            return false;
+        }
+        TOKEN_ELEVATION eve;
+        DWORD len = 0;
+        if (GetTokenInformation(hToken, TokenElevation, &eve, sizeof(eve), &len) == FALSE) {
+            ShowError();
+            return false;
+        }
+        CloseHandle(hToken);
+        if (len == sizeof(eve)) {
+            return eve.TokenIsElevated;
+        }
+
+        printf("length of tokenInfomation is %d \r\n", len);
+        return false;
+    }
+```
+
+## 以管理员权限运行程序
+```cpp
+    static bool RunAsAdmin()
+    {
+        //TODO 获取管理员权限，使用该权限创建进程。
+
+        WCHAR sPath[MAX_PATH] = { 0 };
+        GetModuleFileNameW(NULL, sPath, MAX_PATH);
+
+        STARTUPINFOW si = { 0 };
+        si.cb = sizeof(STARTUPINFOW);
+        PROCESS_INFORMATION pi = { 0 };
+
+        BOOL ret = CreateProcessWithLogonW((LPCWSTR)"Administrator", NULL, NULL, LOGON_WITH_PROFILE,
+            NULL, sPath, CREATE_UNICODE_ENVIRONMENT, NULL, NULL, &si, &pi);
+
+        if (!ret) {
+            MessageBox(NULL, TEXT("创建进程失败"), TEXT("程序错误"), MB_OK | MB_ICONERROR);
+            ShowError();
+            return false;
+        }
+
+        MessageBox(NULL, TEXT("进程创建成功"), TEXT("用户状态"), 0);
+
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        return true;
+    }
+
+```
