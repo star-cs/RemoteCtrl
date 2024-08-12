@@ -95,6 +95,9 @@ public:
 
 # API笔记
 
+## _endthread _endthreadex
+_endthread 和 _endthreadex 显示调用会导致在线程挂起的 C++ 析构函数不调用。所以需要另外创建并调用功能函数实现。
+
 ## OutputDebugString();
 OutputDebugString 是一个 Windows API 函数，主要用于在调试过程中向调试器输出文本消息。
 
@@ -491,3 +494,4 @@ int SendScreen()
     }
 
 ```
+

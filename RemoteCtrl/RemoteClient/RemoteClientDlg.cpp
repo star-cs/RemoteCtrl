@@ -1,5 +1,4 @@
-﻿
-// RemoteClientDlg.cpp: 实现文件
+﻿// RemoteClientDlg.cpp: 实现文件
 //
 
 #include "pch.h"
@@ -254,7 +253,7 @@ void CRemoteClientDlg::DealCommand(WORD nCmd, const std::string& strData, LPARAM
 	case 9:
 		MessageBox("删除文件完成!", "操作完成", MB_ICONINFORMATION);
 		break;
-	case 2024://测试连接
+	case 2024: // 测试连接
 		MessageBox("连接测试成功!", "连接成功", MB_ICONINFORMATION);
 		break;
 	default:
@@ -287,7 +286,7 @@ void CRemoteClientDlg::Str2DriveTree(std::string data, CTreeCtrl& tree)
 
 void CRemoteClientDlg::UpdateFileInfo(FILEINFO& fileInfo, HTREEITEM hTreeSelected)
 {
-	//最后还有一个应答包
+	//最后还有一个结束应答包
 	if (fileInfo.HasNext == false) return;
 
 	TRACE("fileInfo.szFileName = %s\r\n", fileInfo.szFileName);
