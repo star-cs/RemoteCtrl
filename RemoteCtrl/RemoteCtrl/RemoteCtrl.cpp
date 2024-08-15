@@ -9,6 +9,7 @@
 #include "Tool.h"
 
 #include "conio.h"
+#include "MyQueue.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -63,111 +64,37 @@ enum {
     IocpListPop
 };
 
-typedef struct IocpParam {
-    int nOperator;
-    std::string strData;
-
-    _beginthread_proc_type cbFunc;    //回调
-    
-    IocpParam(int op, const char* sData, _beginthread_proc_type cb = NULL) {
-        nOperator = op; 
-        strData = sData;
-        cbFunc = cb;
-    }
-
-    IocpParam() {
-        nOperator = -1;
-    }
-}IOCP_PARAM;
-
-
-void threadMain(HANDLE hIocp)
-{
-
-    std::list<std::string> lstStrings;
-    DWORD dwTransferred = 0;
-    ULONG_PTR CompletionKey = 0;
-    OVERLAPPED* pOverlapped = NULL;
-
-    while (GetQueuedCompletionStatus(hIocp, &dwTransferred, &CompletionKey, &pOverlapped, INFINITE)) {
-        if ((dwTransferred == 0) && (CompletionKey == NULL)) {
-            printf("thread is prepare to exit \r\n");
-            break;
-        }
-        IOCP_PARAM* pParam = (IOCP_PARAM*)CompletionKey;
-        if (pParam->nOperator == IocpListPush) {
-            lstStrings.push_back(pParam->strData);
-        }
-        else if (pParam->nOperator == IocpListPop) {
-            std::string* pStr = NULL;
-            if (lstStrings.size() > 0) {
-                pStr = new std::string(lstStrings.front());
-                lstStrings.pop_front();
-            }
-            if (pParam->cbFunc) {
-                pParam->cbFunc(pStr);
-            }
-        }
-        else if (pParam->nOperator == IocpListEmpty) {
-            lstStrings.clear();
-        }
-
-        delete pParam;
-    }
-    lstStrings.clear();
-}
-
-void threadQueueKey(HANDLE hIocp)
-{
-    threadMain(hIocp); 
-    _endthread(); // _endthread 和 _endthreadex 显示调用会导致在线程挂起的 C++ 析构函数不调用。所以需要另外调用功能函数实现。
-
-}
-
-void func(void* arg)
-{
-    std::string* pstr = (std::string*)arg;
-    if (pstr != NULL) {
-        printf("pop from list:%s\r\n", pstr->c_str());
-        delete pstr;
-    }
-    else {
-        printf("list is empty\r\n");
-    }
-}
-
 int main()
 {
     if (!CTool::Init()) return 1;
+
     printf("press any key to continue ... \r\n");
 
-    HANDLE hIOCP = INVALID_HANDLE_VALUE;
-    hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
-    HANDLE hThread = (HANDLE)_beginthread(threadQueueKey, 0, hIOCP);
+    CMyQueue<std::string> lstStrings;
 
+      
     ULONGLONG tick = GetTickCount64();
     ULONGLONG tick0 = GetTickCount64();
 
     while (_kbhit() == 0) {
         if (GetTickCount64() - tick0 > 1300) {
-            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "", func), NULL);
+            lstStrings.PushBack("hello world");
             tick0 = GetTickCount64();
         }
 
         if (GetTickCount64() - tick > 2000){
-            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "Hello World"), NULL);
+            std::string data;
+            lstStrings.PopFront(data);
+            printf("pop from queue:%s\r\n", data.c_str());
             tick = GetTickCount64();
         }
         Sleep(1);
     }
+    printf("exit doen ! size = %d\r\n", lstStrings.Size());
+    lstStrings.Clear();
+    printf("exit doen ! size = %d\r\n", lstStrings.Size());
+    ::exit(0);
 
-    if (hIOCP != NULL) {
-        PostQueuedCompletionStatus(hIOCP, 0, NULL, NULL);
-        WaitForSingleObject(hThread, INFINITE);
- 
-    }
-
-    CloseHandle(hIOCP);
     /**
     if (!CTool::IsAdmin()) {        //TODO:这里条件取反 为了测试方便避免提权操作
         if (!CTool::Init()) return 1;
