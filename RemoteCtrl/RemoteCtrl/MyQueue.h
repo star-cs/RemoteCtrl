@@ -24,7 +24,7 @@ public:
 		{
 			nOperator = op;
 			Data = data;
-			hEve = hEve;
+			hEvent = hEve;
 		}
 		IocpParam() {
 			nOperator = EQNone;
@@ -33,18 +33,27 @@ public:
 
 public:
 	CMyQueue() {
-		m_hCompeletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
-		m_hThread = (HANDLE)_beginthread(threadEntry, 0, m_hCompeletionPort);
-
+		m_lock = false;
+		m_hCompeletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);//创建一个完成端口
+		m_hThread = INVALID_HANDLE_VALUE;
+		if (m_hCompeletionPort != NULL)//完全端口创建成功才创建线程
+		{
+			//创建线程
+			m_hThread = (HANDLE)_beginthread(&CMyQueue<T>::threadEntry, 0, this);
+		}
 	}
 
 	~CMyQueue() {
+		if (m_lock) return;
 		m_lock = true;
 		PostQueuedCompletionStatus(m_hCompeletionPort, 0, NULL, NULL);
 		WaitForSingleObject(m_hThread, INFINITE);
-		HANDLE hTemp = m_hCompeletionPort;
-		m_hCompeletionPort = NULL;
-		CloseHandle(hTemp);
+		if (m_hCompeletionPort != NULL) {
+			HANDLE hTemp = m_hCompeletionPort;
+			m_hCompeletionPort = NULL;
+			CloseHandle(hTemp);
+		}
+
 	}
 
 	bool PushBack(const T& data) {
@@ -84,7 +93,7 @@ public:
 
 	size_t Size() {
 		HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-		IocpParam pParam(EQSize, NULL, hEvent);
+		IocpParam pParam(EQSize, T(), hEvent);
 
 		if (m_lock) {
 			CloseHandle(hEvent);
@@ -104,13 +113,13 @@ public:
 	}
 
 	bool Clear() {
-		IocpParam* pParam = new IocpParam(EQClear, NULL);
+		IocpParam* pParam = new IocpParam(EQClear, T());
 		if (m_lock) {
 			delete pParam;
 			return false;
 		}
 
-		BOOL ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM), (ULONG_PTR)&pParam, NULL);
+		BOOL ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM), (ULONG_PTR)pParam, NULL);
 		if (ret == false) {
 			delete pParam;
 		}
@@ -119,7 +128,7 @@ public:
 
 private:
 	static void threadEntry(void* arg) {
-		CMyQueue* thiz = (CMyQueue*)arg;
+		CMyQueue<T>* thiz = (CMyQueue<T>*)arg;
 		thiz->threadMain();
 		_endthread();
 	}
@@ -128,7 +137,7 @@ private:
 		PPARAM* pParam = NULL;
 		DWORD dwTransferred = 0;
 		ULONG_PTR CompletionKey = 0;
-		OVERLAPPED* pOverlapped;
+		OVERLAPPED* pOverlapped = NULL;
 		while (GetQueuedCompletionStatus(m_hCompeletionPort, &dwTransferred, &CompletionKey, &pOverlapped, INFINITE))
 		{
 			if ((dwTransferred == 0) && (CompletionKey == NULL)) {

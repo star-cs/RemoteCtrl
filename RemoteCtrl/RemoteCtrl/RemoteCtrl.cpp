@@ -64,36 +64,37 @@ enum {
     IocpListPop
 };
 
+void test()
+{
+    CMyQueue<std::string> lstStrings;
+
+    ULONGLONG total = GetTickCount64();
+
+    while (GetTickCount64() - total <= 1000) {
+        lstStrings.PushBack("hello world");
+    }
+    printf("push doen ! size = %d\r\n", lstStrings.Size());
+
+    total = GetTickCount64();
+    std::string data;
+    while (GetTickCount64() - total <= 1000) {
+        lstStrings.PopFront(data);
+    }
+    printf("pop doen ! size = %d\r\n", lstStrings.Size());
+
+    lstStrings.Clear();
+}
+
 int main()
 {
     if (!CTool::Init()) return 1;
 
-    printf("press any key to continue ... \r\n");
-
-    CMyQueue<std::string> lstStrings;
-
-      
-    ULONGLONG tick = GetTickCount64();
-    ULONGLONG tick0 = GetTickCount64();
-
-    while (_kbhit() == 0) {
-        if (GetTickCount64() - tick0 > 1300) {
-            lstStrings.PushBack("hello world");
-            tick0 = GetTickCount64();
-        }
-
-        if (GetTickCount64() - tick > 2000){
-            std::string data;
-            lstStrings.PopFront(data);
-            printf("pop from queue:%s\r\n", data.c_str());
-            tick = GetTickCount64();
-        }
-        Sleep(1);
+    for (int i = 0; i < 10; i++)
+    {
+        test();
     }
-    printf("exit doen ! size = %d\r\n", lstStrings.Size());
-    lstStrings.Clear();
-    printf("exit doen ! size = %d\r\n", lstStrings.Size());
-    ::exit(0);
+    
+    //::exit(0);  终止程序，不会触发析构
 
     /**
     if (!CTool::IsAdmin()) {        //TODO:这里条件取反 为了测试方便避免提权操作
