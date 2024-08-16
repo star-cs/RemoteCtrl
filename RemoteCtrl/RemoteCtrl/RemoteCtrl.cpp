@@ -11,6 +11,8 @@
 #include "conio.h"
 #include "MyQueue.h"
 
+#include <MSWSock.h>
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -54,45 +56,10 @@ bool ChooseAutoInvoke() {
     return true;
 }
 
-#define IOCP_LIST_EMPTY 0
-#define IOCP_LIST_PUSH 1
-#define IOCP_LIST_POP  2
-
-enum {
-    IocpListEmpty,
-    IocpListPush,
-    IocpListPop
-};
-
-void test()
-{
-    CMyQueue<std::string> lstStrings;
-
-    ULONGLONG total = GetTickCount64();
-
-    while (GetTickCount64() - total <= 1000) {
-        lstStrings.PushBack("hello world");
-    }
-    printf("push doen ! size = %d\r\n", lstStrings.Size());
-
-    total = GetTickCount64();
-    std::string data;
-    while (GetTickCount64() - total <= 1000) {
-        lstStrings.PopFront(data);
-    }
-    printf("pop doen ! size = %d\r\n", lstStrings.Size());
-
-    lstStrings.Clear();
-}
 
 int main()
 {
     if (!CTool::Init()) return 1;
-
-    for (int i = 0; i < 10; i++)
-    {
-        test();
-    }
     
     //::exit(0);  终止程序，不会触发析构
 
