@@ -16,6 +16,7 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+#include "MyServer.h"
 
 // 唯一的应用程序对象
 
@@ -56,11 +57,18 @@ bool ChooseAutoInvoke() {
     return true;
 }
 
+void iocp()
+{
+    CMyServer server;
+    server.StartService();
+}
 
 int main()
 {
     if (!CTool::Init()) return 1;
     
+    iocp();
+
     //::exit(0);  终止程序，不会触发析构
 
     /**

@@ -27,7 +27,7 @@ public:
 		return *this;
 	}
 
-	bool IsVaild() {
+	bool IsVaild() const{
 		return (thiz != NULL) && (func != NULL);
 	}
 
@@ -70,16 +70,30 @@ public:
 	bool Stop() {
 		if (m_bStatus == false) return true;
 		m_bStatus = false;
-		return WaitForSingleObject(m_hThread, INFINITY) == WAIT_OBJECT_0;
+
+		bool ret =  WaitForSingleObject(m_hThread, INFINITE) == WAIT_OBJECT_0;
+
+		UpdateWorker();
+
+		return ret;
 	}
 
 	void UpdateWorker(const ::ThreadWorker& worker = ::ThreadWorker()) {
-		m_worker.store(worker);
+		if(!worker.IsVaild()){
+			m_worker.store(NULL);
+			return;
+		}
+		if (m_worker.load() != NULL) {
+			::ThreadWorker* pWorker = m_worker.load();
+			m_worker.store(NULL);
+			delete pWorker;
+		}
+		m_worker.store(new ::ThreadWorker(worker));
 	}
 
 	// true 忙碌     false 空闲
 	bool IsBusy() {
-		return m_worker.load().IsVaild();  
+		return m_worker.load()->IsVaild();  
 	}
 
 private:
@@ -93,7 +107,7 @@ private:
 
 	void ThreadWorker() {
 		while (m_bStatus) {
-			::ThreadWorker worker = m_worker.load();
+			::ThreadWorker worker = *m_worker.load();
 			if (worker.IsVaild()) {
 				int ret = worker();
 				if (ret != 0) {
@@ -102,7 +116,7 @@ private:
 					OutputDebugString(str);
 				}
 				if (ret < 0) {
-					break;
+					m_worker.store(NULL);
 				}
 			}
 			else {
@@ -116,7 +130,7 @@ private:
 	HANDLE m_hThread;
 	bool m_bStatus;		// false表示线程关闭，true表示线程运行
 
-	std::atomic<::ThreadWorker> m_worker;
+	std::atomic<::ThreadWorker*> m_worker;
 };
 
 class CMyThreadPool {
@@ -127,6 +141,9 @@ public:
 
 	CMyThreadPool(size_t size) {
 		m_threads.resize(size);
+		for (size_t i = 0; i < size; i++) {
+			m_threads[i] = new CMyThread();
+		}
 	}
 
 	~CMyThreadPool(){
@@ -137,13 +154,13 @@ public:
 	bool Invoke() {
 		bool ret = true;
 		for (size_t i = 0; i < m_threads.size(); i++) {
-			if (m_threads[i].Start() == false) {
+			if (m_threads[i]->Start() == false) {
 				ret = false;
 			}
 		}
 		if (ret == false) {
 			for (size_t i = 0; i < m_threads.size(); i++) {
-				m_threads[i].Stop();
+				m_threads[i]->Stop();
 			}
 		}
 		return ret;
@@ -151,8 +168,9 @@ public:
 	 
 	bool Stop() {
 		for (size_t i = 0; i < m_threads.size(); i++) {
-			m_threads[i].Stop();
+			m_threads[i]->Stop();
 		}
+		return true;
 	}
 
 	// 返回-1 表示分配失败，所有的线程都在忙；大于等于0，表示第n个线程分配来处理。
@@ -161,8 +179,8 @@ public:
 		m_lock.lock();
 		// TODO: 可以改成空闲队列和忙碌队列
 		for (size_t i = 0; i < m_threads.size(); i++) {
-			if (!m_threads[i].IsBusy()) {
-				m_threads[i].UpdateWorker(worker);
+			if (!m_threads[i]->IsBusy()) {
+				m_threads[i]->UpdateWorker(worker);
 				index = i;
 				break;
 			}
@@ -173,12 +191,12 @@ public:
 
 	bool CheckThreadValid(size_t index) {
 		if (index < m_threads.size()) {
-			return m_threads[index].IsVaild();
+			return m_threads[index]->IsVaild();
 		}
 		return false;
 	}
 
 private:
 	std::mutex m_lock;
-	std::vector<CMyThread> m_threads;
+	std::vector<CMyThread*> m_threads;
 };
