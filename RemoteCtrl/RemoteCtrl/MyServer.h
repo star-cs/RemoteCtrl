@@ -26,6 +26,9 @@ public:
 
     ThreadWorker m_worker;  // 处理函数
     CMyServer* m_server;    // 服务器
+
+    PCLIENT m_pClient;      //对应的客户端
+    WSABUF m_wsaBuffer;     //
 };
 
 
@@ -50,7 +53,14 @@ public:
                 (sockaddr**)m_pClient->GetLocalAddr(), &lLength,      //本地地址
                 (sockaddr**)m_pClient->GetRemoteAddr(), &rLength       //远程地址
             );
+            // WSARecv 通知 IOCP 相关消息。之后再去 recv
+            int ret = WSARecv((SOCKET)*m_pClient,  m_pClient->RecvWSABuf(), 1, *m_pClient, &m_pClient->flags(), *m_pClient, NULL);
+            if (ret == SOCKET_ERROR && (WSAGetLastError() != WSA_IO_PENDING)) {
+                //TODO：报错
 
+            }
+
+            // 结束之后，再次Accept下一次连接。
             if (!m_server->NewAccept())
             {
                 return -2;
@@ -58,8 +68,6 @@ public:
         }
         return -1;
     }
-
-    PCLIENT m_pClient;
 };
 typedef AcceptOverlapped<MAccept> ACCEPTOVERLAPPED;
 
@@ -68,14 +76,16 @@ template<ServerOperator>
 class RecvOverlapped : public CBaseOverlapped, ThreadFuncBase
 {
 public:
-    RecvOverlapped() : m_operator(MRecv), m_worker(this, &RecvOverlapped::RecvWorker) {
+    RecvOverlapped() {
+        m_operator = MRecv;
+        m_worker = ThreadWorker(this, (FUNCTYPE)&RecvOverlapped::RecvWorker);
         memset(&m_overlapped, 0, sizeof(m_overlapped));
         m_buffer.resize(1024 * 256);
     }
 
     int RecvWorker() {
-        // TODO:
-
+        int ret = m_pClient->Recv();
+        return ret;
     }
 };
 typedef RecvOverlapped<MRecv> RECVOVERLAPPED;
@@ -85,13 +95,16 @@ template<ServerOperator>
 class SendOverlapped : public CBaseOverlapped, ThreadFuncBase
 {
 public:
-    SendOverlapped() :m_operator(MSend), m_worker(this, &SendOverlapped::SendWorker) {
+    SendOverlapped() {
+        m_operator = MSend;
+        m_worker = ThreadWorker(this, (FUNCTYPE)&SendOverlapped::SendWorker);
         memset(&m_overlapped, 0, sizeof(m_overlapped));
         m_buffer.resize(1024 * 256);
     }
 
     int SendWorker() {
         // TODO:
+        return -1;
     }
 };
 typedef SendOverlapped<MSend> SENDOVERLAPPED;
@@ -101,20 +114,28 @@ template<ServerOperator>
 class ErrorOverlapped : public CBaseOverlapped, ThreadFuncBase
 {
 public:
-    ErrorOverlapped() :m_operator(MError), m_worker(this, &ErrorOverlapped::ErrorWorker) {
+    ErrorOverlapped(){
+        m_operator = MError;
+        m_worker = ThreadWorker(this, (FUNCTYPE)&ErrorOverlapped::ErrorWorker);
         memset(&m_overlapped, 0, sizeof(m_overlapped));
         m_buffer.resize(1024 * 256);
     }
 
     int ErrorWorker() {
         // TODO:
+        return -1;
     }
 };
 typedef ErrorOverlapped<MError> ERROROVERLAPPED;
 
 class MyClient {
 public:
-    MyClient() :m_isBusy(false) {
+    MyClient() :
+        m_isBusy(false), m_flags(0), 
+        m_overlapped(new ACCEPTOVERLAPPED()),
+        m_recvOverlapped(new RECVOVERLAPPED()),
+        m_sendOverlapped(new SENDOVERLAPPED())
+    {
         m_sock = WSASocketW(PF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
         m_buffer.resize(1024);
         memset(&m_laddr, 0, sizeof(sockaddr_in));
@@ -127,7 +148,9 @@ public:
 
     void SetOverlapped(PCLIENT& ptr) {
         // 使得 overlapped 可以访问对应的 m_pClient
-        m_overlapped.m_pClient = ptr;
+        m_overlapped->m_pClient = ptr;
+        m_recvOverlapped->m_pClient = ptr;
+        m_sendOverlapped->m_pClient = ptr;
     }
 
     operator SOCKET() {
@@ -144,20 +167,44 @@ public:
     }
 
     operator LPOVERLAPPED() {
-        return &m_overlapped.m_overlapped;
+        return &(m_overlapped->m_overlapped);
     }
     
+    LPWSABUF RecvWSABuf() {
+        return &m_recvOverlapped->m_wsaBuffer;
+    }
+
+    LPWSABUF SendWSABuf() {
+        return &m_sendOverlapped->m_wsaBuffer;
+    }
+
     sockaddr_in* GetLocalAddr() { return &m_laddr; }
     sockaddr_in* GetRemoteAddr() { return &m_raddr; }
+    size_t GetBufferSize() const { return m_buffer.size(); }
+    DWORD& flags() { return m_flags; }
+
+    int Recv() {
+        int ret = recv(m_sock, m_buffer.data() + m_usedIndex, m_buffer.size() - m_usedIndex, 0);
+        if (ret <= 0) return -1;
+        m_usedIndex += (size_t)ret;
+        // TODO :解析数据
+        return 0;
+    }
 
 private:
     SOCKET m_sock;
     DWORD m_received;
-    ACCEPTOVERLAPPED m_overlapped;  // 传出参数，为了得到操作，缓冲区，服务器信息。
+    DWORD m_flags;
+    std::shared_ptr<ACCEPTOVERLAPPED> m_overlapped;  // 传出参数，为了得到操作，缓冲区，服务器信息。
+    std::shared_ptr<RECVOVERLAPPED> m_recvOverlapped;
+    std::shared_ptr<SENDOVERLAPPED> m_sendOverlapped;
     std::vector<char> m_buffer;     // 用于Accept
+    size_t m_usedIndex;             //已经使用了的缓冲区
     sockaddr_in m_laddr;
     sockaddr_in m_raddr;
     bool m_isBusy;
+    
+
 };
 
 class CMyServer :
@@ -203,7 +250,7 @@ public:
         CreateIoCompletionPort((HANDLE)m_sock, m_hIocp, (ULONG_PTR)this, 0);
         // 每次创建一个servSock，就会调用threadIocp，接收端口完成。
         threadPool.DispatchWorker(ThreadWorker(this, (FUNCTYPE)&CMyServer::threadIocp));
-
+        if (!NewAccept()) return false;
         return true;
     }
 
@@ -213,6 +260,9 @@ public:
 
         m_clients.insert(std::pair<SOCKET, PCLIENT>(*pClient, pClient));        // ? 不理解
 
+        // 如果客户端在连接建立时发送了数据，这些数据会被存储在 lpOutputBuffer 缓冲区中。
+        // 你可以通过 GetAcceptExSockaddrs 函数来获取客户端和服务器的地址信息
+        // pClient 会传出参数
         if (!AcceptEx(m_sock, *pClient, *pClient, 0, sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16, *pClient, *pClient)) {
             m_hIocp = INVALID_HANDLE_VALUE;
             closesocket(m_sock);
