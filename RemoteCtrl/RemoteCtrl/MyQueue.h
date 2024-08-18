@@ -2,6 +2,8 @@
 #include <list>
 #include <atomic>
 
+#include "MyThread.h"
+
 template <class T>
 class CMyQueue
 {
@@ -43,7 +45,7 @@ public:
 		}
 	}
 
-	~CMyQueue() {
+	virtual ~CMyQueue() {
 		if (m_lock) return;
 		m_lock = true;
 		PostQueuedCompletionStatus(m_hCompeletionPort, 0, NULL, NULL);
@@ -52,8 +54,7 @@ public:
 			HANDLE hTemp = m_hCompeletionPort;
 			m_hCompeletionPort = NULL;
 			CloseHandle(hTemp);
-		}
-
+		} 
 	}
 
 	bool PushBack(const T& data) {
@@ -69,7 +70,7 @@ public:
 		return ret;
 	}
 
-	bool PopFront(T& data) {
+	virtual bool PopFront(T& data) {
 		HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 		IocpParam pParam(EQPop, data, hEvent);
 
@@ -126,7 +127,7 @@ public:
 		return ret;
 	}
 
-private:
+protected:
 	static void threadEntry(void* arg) {
 		CMyQueue<T>* thiz = (CMyQueue<T>*)arg;
 		thiz->threadMain();
@@ -165,7 +166,7 @@ private:
 		CloseHandle(hTemp);
 	}
 
-	void DealParam(PPARAM* pParam) {
+	virtual void DealParam(PPARAM* pParam) {
 		switch (pParam->nOperator)
 		{
 		case EQPush:
@@ -202,7 +203,7 @@ private:
 	}
 
 
-private:
+protected:
 	std::list<T> m_lstData;
 	HANDLE m_hCompeletionPort;
 	HANDLE m_hThread;
@@ -211,3 +212,102 @@ private:
 
 };
 
+
+
+template<class T>
+class CMySendQueue : public CMyQueue<T>, public ThreadFuncBase
+{
+
+public:
+	typedef int (ThreadFuncBase::* MYCALLBACK)(T& data);
+
+	CMySendQueue(ThreadFuncBase* obj, MYCALLBACK callback)
+		:CMyQueue<T>(), m_base(obj), m_callback(callback)
+	{
+		// 开启一个线程，专门用于发生队列的数据。
+		m_thread.Start();
+		m_thread.UpdateWorker(::ThreadWorker(this, (FUNCTYPE)&CMySendQueue<T>::threadTick));
+	}  
+
+	virtual ~CMySendQueue() {
+		m_base = NULL;
+		m_callback = NULL;
+		m_thread.Stop();
+	}
+
+protected:
+	int threadTick() {
+		// 确保父类 Queue 的 处理消息线程存在
+		if (WaitForSingleObject(CMyQueue<T>::m_hThread, 0) != WAIT_TIMEOUT) return -1;
+
+		if (CMyQueue<T>::m_lstData.size() > 0) {
+			PopFront();
+		}
+		Sleep(1);
+		return 0;		// 返回0，线程会不停处理这个方法。
+	}
+
+	virtual bool PopFront(T& data) { return false; };
+
+	bool PopFront() {
+		typename CMyQueue<T>::IocpParam* pParam = new typename CMyQueue<T>::IocpParam(CMyQueue<T>::EQPop, T());
+		if (CMyQueue<T>::m_lock) {
+			delete pParam;
+			return false;
+		}
+
+		BOOL ret = PostQueuedCompletionStatus(CMyQueue<T>::m_hCompeletionPort, sizeof(*pParam), (ULONG_PTR)&pParam, NULL);
+		if (ret == false) {
+			delete pParam;
+			return false;
+		}
+
+		return ret;
+	}
+
+	//virtual void DealParam(PPARAM* pParam) {
+	virtual void DealParam(typename CMyQueue<T>::PPARAM* pParam) {
+		switch (pParam->nOperator)
+		{
+		case CMyQueue<T>::EQPush:
+			CMyQueue<T>::m_lstData.push_back(pParam->Data);
+			delete pParam;
+			break;
+
+		case CMyQueue<T>::EQPop:
+			if (CMyQueue<T>::m_lstData.size() > 0) {
+				pParam->Data = CMyQueue<T>::m_lstData.front();
+				// 文件可能很大。
+				if((m_base->*m_callback)(pParam->Data) == 0)
+					CMyQueue<T>::m_lstData.pop_front();
+			}
+			
+			delete pParam;
+			break;
+
+		case CMyQueue<T>::EQSize:
+			pParam->nOperator = CMyQueue<T>::m_lstData.size();
+			if (pParam->hEvent != NULL) {
+				SetEvent(pParam->hEvent);
+			}
+			break;
+
+		case CMyQueue<T>::EQClear:
+			CMyQueue<T>::m_lstData.clear();
+			delete pParam;
+			break;
+
+		default:
+			OutputDebugString("unlnown operator! \r\n");
+			break;
+		}
+	}
+
+private:
+	ThreadFuncBase* m_base;
+	MYCALLBACK m_callback;		// 绑定，Pop的时候调用 MyClient::SendData 方法
+	CMyThread m_thread;
+};
+
+
+typedef CMySendQueue<std::vector<char>>::MYCALLBACK SENDCALLBACK;

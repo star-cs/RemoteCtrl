@@ -10,6 +10,11 @@
 #define VC_EXTRALEAN            // 从 Windows 头文件中排除极少使用的内容
 #endif
 
+
+//https://kinddragon.github.io/vld/ 内存泄露检查工具
+//https://www.cnblogs.com/yapingxin/p/18258139/use_vld_in_vs2022 VS添加教程
+#include <vld.h>
+
 #include <afx.h>
 #include <afxwin.h>         // MFC 核心组件和标准组件
 #include <afxext.h>         // MFC 扩展

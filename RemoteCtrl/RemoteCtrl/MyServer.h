@@ -26,9 +26,14 @@ public:
 
     ThreadWorker m_worker;  // 处理函数
     CMyServer* m_server;    // 服务器
-
-    PCLIENT m_pClient;      //对应的客户端
+    MyClient* m_pClient;    // 对应的客户端。之前的 PCLIENT ，存在自己引用自己情况，最终释放 map 里的 client 不会调用析构函数。
+ 
     WSABUF m_wsaBuffer;     //
+
+    virtual ~CBaseOverlapped() {
+        m_buffer.clear();
+
+    }
 };
 
 
@@ -47,7 +52,7 @@ public:
     int AcceptWorker() {
         // TODO:
         INT lLength = 0, rLength = 0;
-        if (*(LPDWORD)*m_pClient.get() > 0) {
+        if (*(LPDWORD)*m_pClient > 0) {
             GetAcceptExSockaddrs(*m_pClient, 0,
                 sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16,
                 (sockaddr**)m_pClient->GetLocalAddr(), &lLength,      //本地地址
@@ -57,10 +62,10 @@ public:
             int ret = WSARecv((SOCKET)*m_pClient,  m_pClient->RecvWSABuf(), 1, *m_pClient, &m_pClient->flags(), *m_pClient, NULL);
             if (ret == SOCKET_ERROR && (WSAGetLastError() != WSA_IO_PENDING)) {
                 //TODO：报错
-
+                CTool::ShowError();
             }
 
-            // 结束之后，再次Accept下一次连接。
+            // 结束之后，再次Accept进行下一次连接。
             if (!m_server->NewAccept())
             {
                 return -2;
@@ -104,6 +109,11 @@ public:
 
     int SendWorker() {
         // TODO:
+        /*
+            1. Send可能不会立即完成。
+
+        */
+
         return -1;
     }
 };
@@ -128,13 +138,14 @@ public:
 };
 typedef ErrorOverlapped<MError> ERROROVERLAPPED;
 
-class MyClient {
+class MyClient :public ThreadFuncBase{
 public:
     MyClient() :
-        m_isBusy(false), m_flags(0), 
+        m_isBusy(false), m_flags(0),
         m_overlapped(new ACCEPTOVERLAPPED()),
         m_recvOverlapped(new RECVOVERLAPPED()),
-        m_sendOverlapped(new SENDOVERLAPPED())
+        m_sendOverlapped(new SENDOVERLAPPED()),
+        m_vecSend(this, (SENDCALLBACK)&MyClient::SendData)      // 用SENDCALLBACK，因为那边是关于 T 的别名，不知道 T 是多少，所以还得搞一个别名。
     {
         m_sock = WSASocketW(PF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
         m_buffer.resize(1024);
@@ -144,13 +155,18 @@ public:
 
     ~MyClient() {
         closesocket(m_sock);
+        m_overlapped.reset();
+        m_recvOverlapped.reset();
+        m_sendOverlapped.reset();
+        m_buffer.clear();
+        m_vecSend.Clear();
     }
 
     void SetOverlapped(PCLIENT& ptr) {
         // 使得 overlapped 可以访问对应的 m_pClient
-        m_overlapped->m_pClient = ptr;
-        m_recvOverlapped->m_pClient = ptr;
-        m_sendOverlapped->m_pClient = ptr;
+        m_overlapped->m_pClient = ptr.get();
+        m_recvOverlapped->m_pClient = ptr.get();
+        m_sendOverlapped->m_pClient = ptr.get();
     }
 
     operator SOCKET() {
@@ -191,6 +207,27 @@ public:
         return 0;
     }
 
+    int Send(void* buffer, size_t nSize) {
+        std::vector<char> data(nSize);
+        memcpy(data.data(), buffer, nSize);
+        if (m_vecSend.PushBack(data) == false) {
+            return -1;
+        }
+        return 0;
+    }
+
+    int SendData(std::vector<char>& data) {
+        // TODO：实际上从队列中取包，发数据。
+        if (m_vecSend.Size() > 0) {
+            int ret = WSASend(m_sock, SendWSABuf(), 1, &m_received, m_flags, &m_sendOverlapped->m_overlapped, NULL);
+            if (ret != 0 && (WSAGetLastError() != WSA_IO_PENDING)) {
+                CTool::ShowError();
+                return -1;
+            }
+        }
+        return 0; 
+    }
+
 private:
     SOCKET m_sock;
     DWORD m_received;
@@ -199,12 +236,12 @@ private:
     std::shared_ptr<RECVOVERLAPPED> m_recvOverlapped;
     std::shared_ptr<SENDOVERLAPPED> m_sendOverlapped;
     std::vector<char> m_buffer;     // 用于Accept
-    size_t m_usedIndex;             //已经使用了的缓冲区
+    size_t m_usedIndex;             // 已经使用了的缓冲区
     sockaddr_in m_laddr;
     sockaddr_in m_raddr;
     bool m_isBusy;
     
-
+    CMySendQueue<std::vector<char>> m_vecSend;      // 发送数据队列
 };
 
 class CMyServer :
@@ -220,7 +257,15 @@ public:
         m_addr.sin_addr.s_addr = inet_addr(IP.c_str());
     }
 
-    ~CMyServer(){}
+    ~CMyServer(){
+        closesocket(m_sock);
+        for (auto it = m_clients.begin(); it != m_clients.end(); it++) {
+            it->second.reset();     // share_ptr 存在自己引用了自己情况，所以不会析构。
+        }
+        m_clients.clear();
+        CloseHandle(m_hIocp);
+        threadPool.Stop();
+    }
 
     bool StartService() {
         m_sock = WSASocketW(PF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
@@ -246,8 +291,10 @@ public:
             m_sock = INVALID_SOCKET;
             return false;
         }
-
         CreateIoCompletionPort((HANDLE)m_sock, m_hIocp, (ULONG_PTR)this, 0);
+
+
+        threadPool.Invoke();
         // 每次创建一个servSock，就会调用threadIocp，接收端口完成。
         threadPool.DispatchWorker(ThreadWorker(this, (FUNCTYPE)&CMyServer::threadIocp));
         if (!NewAccept()) return false;
@@ -260,6 +307,7 @@ public:
 
         m_clients.insert(std::pair<SOCKET, PCLIENT>(*pClient, pClient));        // ? 不理解
 
+        // AcceptEx
         // 如果客户端在连接建立时发送了数据，这些数据会被存储在 lpOutputBuffer 缓冲区中。
         // 你可以通过 GetAcceptExSockaddrs 函数来获取客户端和服务器的地址信息
         // pClient 会传出参数
@@ -313,6 +361,8 @@ private:
                 break;
 
                 }
+
+                return 0;
             }
             else {
                 return -1;
