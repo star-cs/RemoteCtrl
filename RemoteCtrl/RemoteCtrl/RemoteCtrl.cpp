@@ -57,17 +57,13 @@ bool ChooseAutoInvoke() {
     return true;
 }
 
-void iocp()
-{
-    CMyServer server;
-    server.StartService();
-}
 
 int main()
 {
     if (!CTool::Init()) return 1;
-    
-    iocp();
+    CMyServer server;
+    server.StartService();
+    getchar();
 
     //::exit(0);  终止程序，不会触发析构
 

@@ -80,6 +80,9 @@
     <ClCompile Include="MyThread.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="MyServer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="RemoteCtrl.rc">

@@ -11,9 +11,9 @@
 #endif
 
 
-//https://kinddragon.github.io/vld/ 内存泄露检查工具
-//https://www.cnblogs.com/yapingxin/p/18258139/use_vld_in_vs2022 VS添加教程
-#include <vld.h>
+// https://kinddragon.github.io/vld/ 内存泄露检查工具
+// https://www.cnblogs.com/yapingxin/p/18258139/use_vld_in_vs2022 VS添加教程
+#include <vld.h>	// 必须在 #include <afxwin.h> 之前
 
 #include <afx.h>
 #include <afxwin.h>         // MFC 核心组件和标准组件

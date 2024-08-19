@@ -12,7 +12,8 @@ typedef int(ThreadFuncBase::* FUNCTYPE)();
 class ThreadWorker {
 public:
 	ThreadWorker() :thiz(NULL), func(NULL) {}
-	ThreadWorker(ThreadFuncBase* obj, FUNCTYPE f) :thiz(obj), func(f) {}
+	//ThreadWorker(ThreadFuncBase* obj, FUNCTYPE f) :thiz(obj), func(f) {}
+	ThreadWorker(void* obj, FUNCTYPE f) :thiz((ThreadFuncBase*)obj), func(f) {}
 
 	ThreadWorker(const ThreadWorker& worker) {
 		thiz = worker.thiz;
@@ -82,6 +83,7 @@ public:
 		// 首先保证 m_worker 置空，之前的指向被删除。
 		if (m_worker.load() != NULL && (m_worker.load() != &worker)) {
 			::ThreadWorker* pWorker = m_worker.load();
+			TRACE("delete pWorker = %08X m_worker = %08X \r\n", pWorker, m_worker.load());
 			m_worker.store(NULL);
 			delete pWorker;
 		}
@@ -92,13 +94,14 @@ public:
 			m_worker.store(NULL);
 			return;
 		}
-		
-		m_worker.store(new ::ThreadWorker(worker));
+		::ThreadWorker* pWorker = new ::ThreadWorker(worker);
+		TRACE("new pWorker = %08X m_worker = %08X \r\n", pWorker, m_worker.load());
+		m_worker.store(pWorker);
 	}
 
 	// true 忙碌     false 空闲
 	bool IsBusy() {
-		if (m_worker.load() == NULL) return true;
+		if (m_worker.load() == NULL) return false;
 		return m_worker.load()->IsVaild();  
 	}
 
@@ -129,7 +132,7 @@ private:
 					OutputDebugString(str); 
 				}
 				if (ret < 0) {
-					m_worker.store(NULL);
+					UpdateWorker();
 				}
 			}
 			else {

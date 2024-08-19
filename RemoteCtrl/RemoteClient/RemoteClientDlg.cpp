@@ -185,7 +185,7 @@ void CRemoteClientDlg::InitUIData()
 	//m_server_address = 0x7F000001;
 	//192.168.56.1 0xc0a83865
 	//192.168.56.101	
-	m_server_address = 0xc0a83865;
+	m_server_address = 0x7F000001;
 	m_nPort = _T("9527");
 	CClientController* pController = CClientController::getInstance();
 	pController->UpdataAddress(m_server_address, atoi((LPCTSTR)m_nPort));

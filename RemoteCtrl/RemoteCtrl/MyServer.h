@@ -3,6 +3,8 @@
 #include "pch.h"
 #include <map>
 #include <MSWSock.h>
+#include "Tool.h"
+#include "MyQueue.h"
 
 enum ServerOperator{
     MNone,
@@ -32,7 +34,6 @@ public:
 
     virtual ~CBaseOverlapped() {
         m_buffer.clear();
-
     }
 };
 
@@ -47,22 +48,31 @@ public:
         memset(&m_overlapped, 0, sizeof(m_overlapped));
         m_buffer.resize(1024);
         m_server = NULL;
+        memset(&m_wsaBuffer, 0, sizeof(WSABUF));
     }
 
     int AcceptWorker() {
         // TODO:
         INT lLength = 0, rLength = 0;
-        if (*(LPDWORD)*m_pClient > 0) {
-            GetAcceptExSockaddrs(*m_pClient, 0,
+        if (m_pClient->GetBufferSize() > 0) {       // m_pClient->GetBufferSize() > 0 意味着 之前 AceeptEx 接收到 client 信息
+            LPSOCKADDR pLocalAddr, pRemoteAddr;
+            GetAcceptExSockaddrs((PVOID)*m_pClient, 0,
                 sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16,
-                (sockaddr**)m_pClient->GetLocalAddr(), &lLength,      //本地地址
-                (sockaddr**)m_pClient->GetRemoteAddr(), &rLength       //远程地址
+                (sockaddr**)&pLocalAddr, &lLength,//本地地址
+                (sockaddr**)&pRemoteAddr, &rLength//远程地址
             );
-            // WSARecv 通知 IOCP 相关消息。之后再去 recv
-            int ret = WSARecv((SOCKET)*m_pClient,  m_pClient->RecvWSABuf(), 1, *m_pClient, &m_pClient->flags(), *m_pClient, NULL);
+
+            memcpy(m_pClient->GetLocalAddr(), pLocalAddr, sizeof(sockaddr_in));
+            memcpy(m_pClient->GetRemoteAddr(), pRemoteAddr, sizeof(sockaddr_in));
+
+            // AcceptEx得到的客户端套接字 绑定 iocp
+            m_server->BindNewSocket(*m_pClient);
+
+            // WSARecv 通知 IOCP 相关消息。之后再去 recv。这里并没有使用到 WSABUF。
+            int ret = WSARecv((SOCKET)*m_pClient,  m_pClient->RecvWSABuf(), 1, *m_pClient, &m_pClient->flags(), m_pClient->RecvOverlapped(), NULL);
             if (ret == SOCKET_ERROR && (WSAGetLastError() != WSA_IO_PENDING)) {
                 //TODO：报错
-                CTool::ShowError();
+                TRACE("ret = %d error = %d\r\n", ret, GetLastError());
             }
 
             // 结束之后，再次Accept进行下一次连接。
@@ -86,6 +96,8 @@ public:
         m_worker = ThreadWorker(this, (FUNCTYPE)&RecvOverlapped::RecvWorker);
         memset(&m_overlapped, 0, sizeof(m_overlapped));
         m_buffer.resize(1024 * 256);
+
+        memset(&m_wsaBuffer, 0, sizeof(WSABUF));
     }
 
     int RecvWorker() {
@@ -105,6 +117,7 @@ public:
         m_worker = ThreadWorker(this, (FUNCTYPE)&SendOverlapped::SendWorker);
         memset(&m_overlapped, 0, sizeof(m_overlapped));
         m_buffer.resize(1024 * 256);
+        memset(&m_wsaBuffer, 0, sizeof(WSABUF));
     }
 
     int SendWorker() {
@@ -129,6 +142,7 @@ public:
         m_worker = ThreadWorker(this, (FUNCTYPE)&ErrorOverlapped::ErrorWorker);
         memset(&m_overlapped, 0, sizeof(m_overlapped));
         m_buffer.resize(1024 * 256);
+        memset(&m_wsaBuffer, 0, sizeof(WSABUF));
     }
 
     int ErrorWorker() {
@@ -141,7 +155,7 @@ typedef ErrorOverlapped<MError> ERROROVERLAPPED;
 class MyClient :public ThreadFuncBase{
 public:
     MyClient() :
-        m_isBusy(false), m_flags(0),
+        m_isBusy(false), m_flags(0), m_received(0), m_usedIndex(0),
         m_overlapped(new ACCEPTOVERLAPPED()),
         m_recvOverlapped(new RECVOVERLAPPED()),
         m_sendOverlapped(new SENDOVERLAPPED()),
@@ -175,23 +189,31 @@ public:
 
     // 当你将对象转换为 PVOID 或 void* 类型时，会自动调用这个操作符来获取所需的指针值。
     operator PVOID() {
-        return &m_buffer[0];
+        return (PVOID)m_buffer.data();
     }
 
     operator LPDWORD() {
         return &m_received;
     }
 
-    operator LPOVERLAPPED() {
-        return &(m_overlapped->m_overlapped);
+    operator LPOVERLAPPED() {           // AcceptEx overlapped用。 Accept特殊的，通过强转获取对应的overlapped。recv，send用下面的方法返回。
+        return &m_overlapped->m_overlapped;
     }
     
     LPWSABUF RecvWSABuf() {
         return &m_recvOverlapped->m_wsaBuffer;
     }
 
+    LPWSAOVERLAPPED RecvOverlapped() {
+        return &m_recvOverlapped->m_overlapped;
+    }
+
     LPWSABUF SendWSABuf() {
         return &m_sendOverlapped->m_wsaBuffer;
+    }
+
+    LPWSAOVERLAPPED SendOverlapped() {
+        return &m_sendOverlapped->m_overlapped;
     }
 
     sockaddr_in* GetLocalAddr() { return &m_laddr; }
@@ -201,9 +223,13 @@ public:
 
     int Recv() {
         int ret = recv(m_sock, m_buffer.data() + m_usedIndex, m_buffer.size() - m_usedIndex, 0);
-        if (ret <= 0) return -1;
+        if (ret <= 0) {
+            TRACE("error %d\r\n", GetLastError());
+            return -1;
+        }
         m_usedIndex += (size_t)ret;
         // TODO :解析数据
+        CTool::Dump((BYTE*)m_buffer.data(), ret);
         return 0;
     }
 
@@ -265,9 +291,12 @@ public:
         m_clients.clear();
         CloseHandle(m_hIocp);
         threadPool.Stop();
+        WSACleanup();
     }
 
     bool StartService() {
+        WSADATA WSAData;
+        WSAStartup(MAKEWORD(2, 2), &WSAData);
         m_sock = WSASocketW(PF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
         int opt = -1;
         setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
@@ -295,8 +324,9 @@ public:
 
 
         threadPool.Invoke();
-        // 每次创建一个servSock，就会调用threadIocp，接收端口完成。
-        threadPool.DispatchWorker(ThreadWorker(this, (FUNCTYPE)&CMyServer::threadIocp));
+        // 创建一个线程，专门用于GetQueuedCompletionStatus处理iocp消息。
+        int ret = threadPool.DispatchWorker(ThreadWorker(this, (FUNCTYPE)&CMyServer::threadIocp));
+        TRACE("Thread index =  %d\r\n", ret);
         if (!NewAccept()) return false;
         return true;
     }
@@ -311,13 +341,32 @@ public:
         // 如果客户端在连接建立时发送了数据，这些数据会被存储在 lpOutputBuffer 缓冲区中。
         // 你可以通过 GetAcceptExSockaddrs 函数来获取客户端和服务器的地址信息
         // pClient 会传出参数
+        TRACE("[服务器]%s(%d):%d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
+       
+        // AcceptEx完成后，发生I/O完成包到IOCP中。通过GetQueuedCompletionStatus可以获取到对应的lpOverlapped（AcceptEx的最后一个参数），初始化的时候已经设置为了SENDOVERLAPPED；
+        
+        // 当您调用 AcceptEx 时，它会立即返回，并启动一个异步接受操作。
+        // 如果此时已经有新的连接请求等待处理，AcceptEx 会立即开始处理该请求。
+        // 如果没有新的连接请求，AcceptEx 会等待新的连接请求到达。
+        
+        // 写入 m_buffer 缓冲成员
         if (!AcceptEx(m_sock, *pClient, *pClient, 0, sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16, *pClient, *pClient)) {
-            m_hIocp = INVALID_HANDLE_VALUE;
-            closesocket(m_sock);
-            m_sock = INVALID_SOCKET;
-            return false;
+            TRACE("%d\r\n", WSAGetLastError());
+            if ((WSAGetLastError() != WSA_IO_PENDING)) {
+                closesocket(m_sock);
+                m_hIocp = INVALID_HANDLE_VALUE;
+                m_sock = INVALID_SOCKET;
+                return false;
+            } 
         }
         return true;
+    }
+
+
+    void BindNewSocket(SOCKET s) {
+        if (CreateIoCompletionPort((HANDLE)s, m_hIocp, (ULONG_PTR)this, 0) == NULL) {
+            TRACE("error %d \r\n", GetLastError());
+        }
     }
 
 private:
@@ -325,17 +374,28 @@ private:
         LPOVERLAPPED lpOverlapped = NULL;
         DWORD transferred = 0;
         ULONG_PTR key = 0;
-
+        TRACE("[服务器]%s(%d):%d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
         if(GetQueuedCompletionStatus(m_hIocp, &transferred, &key, &lpOverlapped, INFINITE))
-        {
-            if (transferred != 0 && (key != 0))
+        {  
+            if (key != 0)
             {
                 CBaseOverlapped* pOverlapped = CONTAINING_RECORD(lpOverlapped, CBaseOverlapped, m_overlapped);
+                TRACE("pOverlapped->m_operator %d \r\n", pOverlapped->m_operator);
+
+                pOverlapped->m_server = this;       // 添加指向server的指针，便于方法内调用 NewAccept()
+
                 switch (pOverlapped->m_operator) {
                 case MAccept:
                 {
                     ACCEPTOVERLAPPED* pOver = (ACCEPTOVERLAPPED*)pOverlapped;
-                    threadPool.DispatchWorker(pOver->m_worker);
+                    // eg: 多继承情况下，指针转换会存在偏差。
+                    // ACCEPTOVERLAPPED 继承了 CBaseOverlapped 以及 ThreadFuncBase
+                    // pOver 是 指向 CBaseOverlapped 开头的地址。
+                    // CBaseOverlapped::m_worker 的初始化的时候（在AcceptOverlapped），会调用 ThreadWorker 初始化，会把 thiz(this) 转成 ThreadFuncBase，thiz 和 pOver相比就有偏移。
+
+                    // 解决方法：	ThreadWorker(void* obj, FUNCTYPE f) :thiz((ThreadFuncBase*)obj), func(f) {}
+
+                    threadPool.DispatchWorker(pOver->m_worker);     
                 }
                 break;
 
@@ -359,16 +419,13 @@ private:
                     threadPool.DispatchWorker(pOver->m_worker);
                 }
                 break;
-
-                }
-
-                return 0;
+                }  
             }
             else {
                 return -1;
             }
-            
         }
+        return 0;
     }
 
 private:
