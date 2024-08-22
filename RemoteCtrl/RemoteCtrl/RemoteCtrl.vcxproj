@@ -150,6 +150,8 @@
     <ClInclude Include="Command.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="LockInfoDialog.h" />
+    <ClInclude Include="MNetwork.h" />
+    <ClInclude Include="MSocket.h" />
     <ClInclude Include="MyQueue.h" />
     <ClInclude Include="MyServer.h" />
     <ClInclude Include="MyThread.h" />
@@ -164,6 +166,7 @@
   <ItemGroup>
     <ClCompile Include="Command.cpp" />
     <ClCompile Include="LockInfoDialog.cpp" />
+    <ClCompile Include="MNetwork.cpp" />
     <ClCompile Include="MyQueue.cpp" />
     <ClCompile Include="MyServer.cpp" />
     <ClCompile Include="MyThread.cpp" />
