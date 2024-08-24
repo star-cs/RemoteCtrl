@@ -1,6 +1,7 @@
 #pragma once
 #include "MyThread.h"
 #include "MSocket.h"
+#include <map>
 
 class CMNetwork
 {
@@ -72,7 +73,8 @@ public:
 	int Stop(void* arg);
 
 	int Send(MSOCKET& client, MBuffer& buffer);
-	int SendTo(MBuffer& buffer, MSockaddrIn& addr);;
+
+	int SendTo(MBuffer& buffer, MSockaddrIn& addr);
 
 private:
 	int threadFunc();
@@ -85,6 +87,7 @@ private:
 	CMyThread m_thread;
 	MSOCKET m_sock;
 	std::atomic<bool> m_status;
+	std::map<int, sockaddr_in> map_KeyAddr;
 };
 
 

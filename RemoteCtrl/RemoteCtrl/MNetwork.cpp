@@ -2,6 +2,9 @@
 #include "MNetwork.h"
 #include <conio.h>
 #include <list>
+#include "Tool.h"
+#include "Packet.h"
+#include "ServerSocket.h"
 
 MServer::MServer(const MServerParamter& paramter) : m_status(true), m_arg(NULL)
 {
@@ -73,6 +76,7 @@ int MServer::threadFunc()
     else {
         threadUDPFunc();
     }
+    m_thread.Stop();
     return 0;
 }
 
@@ -89,16 +93,57 @@ int MServer::threadUDPFunc()
 
     while (m_status) {
         ret = m_sock->recvfrom(buffer, client_addr);
+
         if (ret > 0) {
-            //CTool::Dump((BYTE*)buffer.c_str(), ret);
-            client_addr.update();
+            CTool::Dump((BYTE*)buffer, ret);
+
             if (m_params.m_recvfromf != NULL) {
-                m_params.m_recvfromf(m_arg, buffer, client_addr);
+                //m_params.m_recvfromf(m_arg, buffer, client_addr);
             }
+            printf("%s(%d):%s client_addr-ip %s client_addr-port %d\r\n", __FILE__, __LINE__, __FUNCTION__, client_addr.GetIP().c_str() , client_addr.GetPort());
+
+            size_t len = ret;
+            CPacket pack = CPacket((BYTE*)buffer, len);
+
+            // 类型转换真麻烦 :)
+            UdpHole* u = (UdpHole*)pack.strData.c_str();
+
+            printf("%d %d\r\n", u->nType, u->nKey);
+            // TODO: 添加映射关系 key - addr
+            
+            switch (u->nType)
+            {
+            case 1:
+            {
+                auto it = map_KeyAddr.insert(std::pair<int, sockaddr_in>(u->nKey, client_addr));
+                if (it.second) {
+                    printf("%s(%d):%s insert done!\r\n", __FILE__, __LINE__, __FUNCTION__);
+                }
+
+                ret = m_sock->sendto(pack, client_addr);
+                break;
+            }
+            case 2:
+            {
+                auto it = map_KeyAddr.find(u->nKey);
+                if (it != map_KeyAddr.end()) {
+                    printf("%s(%d):%s find addr done!\r\n", __FILE__, __LINE__, __FUNCTION__);
+
+                    //找到了相应的地址。
+                    CPacket pack2 = CPacket(2025, reinterpret_cast<const BYTE*>(&it->second), sizeof(sockaddr_in));
+
+                    ret = m_sock->sendto(pack2, client_addr);
+                }
+                break;
+            }
+            }
+
+            
+            printf("%s(%d):%s ERROR(%d) ret = %d \r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError(), ret);
+
         }
         else {
             printf("%s(%d):%s ERROR(%d) ret = %d \r\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError(), ret);
-            break;
         }
     }
     if (m_status == true) m_status = false;

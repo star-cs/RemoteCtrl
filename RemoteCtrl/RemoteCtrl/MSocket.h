@@ -1,12 +1,13 @@
 #pragma once
 #include <WinSock2.h>
 #include <memory>
+#include "Tool.h"
+#include "Packet.h"
 
 enum class MTYPE {
 	MTypeTCP = 1,
 	MTypeUDP
 };
-
 
 class MSockaddrIn
 {
@@ -63,6 +64,10 @@ public:
 		return (void*)&m_addr;
 	}
 
+	operator sockaddr_in() const {
+		return m_addr;
+	}
+
 	void update() {
 		m_ip = inet_ntoa(m_addr.sin_addr);
 		m_port = ntohs(m_addr.sin_port);
@@ -71,8 +76,8 @@ public:
 	std::string GetIP() const { return m_ip; };
 	short GetPort() const { return m_port; }
 
-	int size() const { return sizeof(sockaddr_in); }
-
+	int size() const { return sizeof(sockaddr); }
+	 
 private:
 	sockaddr_in m_addr;
 	std::string m_ip;
@@ -182,7 +187,12 @@ public:
 	}
 
 	int sendto(const MBuffer& buffer, MSockaddrIn& to){
+		//CTool::Dump((BYTE*)&buffer, sizeof(buffer));
 		return ::sendto(m_socket, buffer, buffer.size(), 0, to, to.size());
+	}
+
+	int sendto(CPacket& pack, MSockaddrIn& to) {
+		return ::sendto(m_socket, (char*)pack.Data(), pack.Size(), 0, to, to.size());
 	}
 
 	int recvfrom(MBuffer& buffer, MSockaddrIn& from){

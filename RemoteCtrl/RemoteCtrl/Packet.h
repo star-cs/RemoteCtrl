@@ -120,11 +120,29 @@ public:
 	WORD sHead;		//固定为，0xFEFF							2
 	DWORD nLength;	//包长度 从控制命令开始，到和检验结束		4
 	WORD sCmd;		//控制命令								2
-	std::string strData;	//包数据							
+	std::string strData;	//包数据						
 	WORD sSum;		//和校验	 校验包数据						2
-	std::string strOut;
+	std::string strOut;	
+
+	// udp情况下，
+	// sCmd = 2025 表示 udp 打洞测试
+	// strData = 1表示 被控端->服务器  2表示 控制端->服务器 3表示 控制端->被控端
 };
 #pragma pack(pop)
+
+typedef struct UdpHole {
+	UdpHole(short type, short key) {
+		nType = type;
+		nKey = key;
+	}
+	// udp情况下，
+	// sCmd = 2025 表示 udp 打洞测试
+	// strData = 1表示 被控端->服务器  2表示 控制端->服务器 3表示 控制端->被控端
+
+	short nType;
+	short nKey;
+}UDP;
+
 
 typedef struct MouseEvent {
 	MouseEvent() {

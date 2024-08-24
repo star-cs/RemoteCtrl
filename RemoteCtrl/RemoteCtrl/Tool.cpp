@@ -10,6 +10,6 @@ void CTool::Dump(BYTE* pData, size_t nSize) {
         strOut += buf;
     }
     strOut += "\n";
-    OutputDebugStringA(strOut.c_str());
+    printf(strOut.c_str());
 }
 
