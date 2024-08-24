@@ -321,6 +321,7 @@ void ClearSockEnv() {
 
 int main(int argc, char* argv[])
 {
+    /*
     if (!CTool::Init()) return 1;
     
     InitSockEnv();
@@ -363,13 +364,14 @@ int main(int argc, char* argv[])
         udp_client2(false);
     }
 
-    ClearSockEnv();
-
+     ClearSockEnv();
+    */
+   
     // iocp();
 
     //::exit(0);  终止程序，不会触发析构
 
-    /**
+
     if (!CTool::IsAdmin()) {        //TODO:这里条件取反 为了测试方便避免提权操作
         if (!CTool::Init()) return 1;
         MessageBox(NULL, TEXT("管理员"), TEXT("用户状态"), 0);
@@ -396,8 +398,6 @@ int main(int argc, char* argv[])
         }
         MessageBox(NULL, TEXT("普通用户"), TEXT("用户状态"), 0);
     }
-    */
     
-
     return 0;
 }
